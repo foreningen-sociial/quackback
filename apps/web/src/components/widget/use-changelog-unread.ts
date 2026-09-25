@@ -33,7 +33,7 @@ export function useChangelogUnread(enabled: boolean): {
     return () => window.removeEventListener(CHANGELOG_SEEN_EVENT, onSeen)
   }, [])
 
-  const entries = data?.pages.flatMap((page) => page.items) ?? []
+  const entries = data?.pages?.flatMap((page) => page.items) ?? []
   const unread = countUnreadChangelogs(entries, seenAt)
 
   const markSeen = useCallback((publishedAt: string) => markChangelogSeen(publishedAt), [])

@@ -17,7 +17,7 @@ export function ChangelogListPublic() {
   const { data: categories = [] } = useQuery(changelogCategoryQueries.list())
   const [activeCategoryId, setActiveCategoryId] = useState<ChangelogCategoryId | null>(null)
 
-  const allEntries = data?.pages.flatMap((page) => page.items) ?? []
+  const allEntries = data?.pages?.flatMap((page) => page.items) ?? []
 
   // Only offer chips for categories that actually appear on a loaded entry,
   // so the filter row never shows a label with nothing to show for it.

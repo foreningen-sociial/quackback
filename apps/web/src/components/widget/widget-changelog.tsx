@@ -31,7 +31,7 @@ export function WidgetChangelog({ teamName, onEntrySelect }: WidgetChangelogProp
   const { data: categories = [] } = useQuery(changelogCategoryQueries.list())
   const [activeCategoryId, setActiveCategoryId] = useState<ChangelogCategoryId | null>(null)
 
-  const allEntries = data?.pages.flatMap((page) => page.items) ?? []
+  const allEntries = data?.pages?.flatMap((page) => page.items) ?? []
 
   // Entries on screen are seen: advance the visitor's marker to the newest
   // loaded entry so the launcher badge clears. The list is newest-first, so

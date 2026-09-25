@@ -42,7 +42,7 @@ export function RoadmapColumn({
   )
 
   const posts = flattenRoadmapViewPosts(data)
-  const total = data?.pages[0]?.total ?? 0
+  const total = data?.pages?.[0]?.total ?? 0
 
   const sentinelRef = useInfiniteScroll({
     hasMore: hasNextPage,
