@@ -290,7 +290,7 @@ export function WidgetHomeAnimated({
   })
 
   const allPopularPosts: WidgetPost[] = useMemo(
-    () => postsData?.pages.flatMap((page) => page.items) ?? [],
+    () => postsData?.pages?.flatMap((page) => page.items) ?? [],
     [postsData]
   )
 

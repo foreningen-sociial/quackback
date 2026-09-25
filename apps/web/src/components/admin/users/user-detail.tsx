@@ -307,7 +307,7 @@ function UserConversations({
 
   if (!supportInboxEnabled) return null
 
-  const conversations: ConversationDTO[] = query.data?.pages.flatMap((p) => p.conversations) ?? []
+  const conversations: ConversationDTO[] = query.data?.pages?.flatMap((p) => p.conversations) ?? []
 
   return (
     <div className={cn(!embedded && 'border-t border-border/50 pt-4')}>
@@ -499,7 +499,7 @@ export function UserDetail({
       }),
     getNextPageParam: (last) => (last.hasMore ? (last.nextCursor ?? undefined) : undefined),
   })
-  const conversationCount = conversationsQuery.data?.pages.flatMap((p) => p.conversations).length
+  const conversationCount = conversationsQuery.data?.pages?.flatMap((p) => p.conversations).length
 
   const startEditing = () => {
     if (!user) return

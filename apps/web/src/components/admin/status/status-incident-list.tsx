@@ -68,7 +68,7 @@ export function StatusIncidentList({ kind, state, emptyMessage }: StatusIncident
     threshold: 0.1,
   })
 
-  const allItems = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data])
+  const allItems = useMemo(() => data?.pages?.flatMap((page) => page.items) ?? [], [data])
 
   // Search filters server-side (query param); only the impact sort is local.
   const items = useMemo(() => {

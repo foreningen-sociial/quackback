@@ -134,7 +134,7 @@ export function StatusSubscribersView() {
     threshold: 0.1,
   })
 
-  const items = data?.pages.flatMap((page) => page.items) ?? []
+  const items = data?.pages?.flatMap((page) => page.items) ?? []
 
   async function handleExport() {
     setExporting(true)
