@@ -178,6 +178,6 @@ export function usePostPermissions({ postId, enabled = true }: UsePostPermission
 export function flattenPublicPosts(
   data: InfiniteData<PublicPostListResult> | undefined
 ): PublicPostListItem[] {
-  if (!data) return []
+  if (!data?.pages) return []
   return data.pages.flatMap((page) => page.items)
 }
