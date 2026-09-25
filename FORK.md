@@ -15,38 +15,43 @@ Quackback documentation (see `README.md`/`CONTRIBUTING.md` for that).
 ## Branches
 
 ```
-main ──────────────────────────────────────────────► (pure upstream mirror)
-  └── i18n-da ──────────────────────────────────────► (Danish locale, PR-bound)
-        └── socii ────────────────────────────────► (+ Socii ops config, DEPLOYED)
-              └── theme ──────────────────────────► (+ Socii visual reskin)
+upstream/main (QuackbackIO/quackback, tracked but never merged into wholesale)
+      ⇣ periodic rebase/merge, by hand, when we choose to pull something in
+main ──────────────────────────────────────────────► (this fork's OWN integration
+  │                                                     branch — receives PRs made
+  │                                                     WITHIN this fork; diverges
+  │                                                     from upstream by design)
+  └── socii ────────────────────────────────────────► (+ Socii ops config, DEPLOYED)
+        └── theme ──────────────────────────────────► (+ Socii visual reskin)
+
+short-lived feature/fix branches (e.g. i18n-da, fix-pagination-guard):
+  branch off main, PR back into THIS FORK'S main (not upstream), then
+  get cherry-picked or rebased into socii/theme for deployment.
 ```
 
-- **`main`** — kept as an exact mirror of upstream `main`. Never gets local
-  commits directly; only fast-forwarded from `upstream/main`. This is the
-  base every other branch eventually rebases onto.
+- **`main`** is **this fork's own integration branch**, not a mirror of
+  upstream. This changed from the original design: `main` started out as a
+  pure, untouched mirror of `upstream/main` (so pulling in upstream updates
+  was always a trivial fast-forward), but we decided to merge fixes and
+  features via ordinary GitHub PRs *within this fork* instead of sending
+  them upstream — so `main` now permanently carries commits `QuackbackIO/quackback`
+  doesn't have (e.g. the pagination-guard fixes merged via PR #1). Treat it
+  as "our own trunk," not as something that should stay fast-forwardable
+  from `upstream/main` — it won't, and that's intentional.
 
-- **`i18n-da`** — the Danish (`da`) locale: the full UI string catalog
-  translation (`apps/web/src/locales/da.json`) plus the small set of source
-  changes needed to register it (`SUPPORTED_LOCALES` in
-  `apps/web/src/lib/shared/i18n.ts`, `WIDGET_LOCALE_LABELS`, the four
-  help-center locale-picker components) and the `TimeAgo` component fix that
-  makes relative timestamps ("2 days ago") respect the active locale instead
-  of always rendering English (fixes this for every non-English locale
-  upstream ships, not just Danish).
+  Consequence: pulling in upstream updates is no longer a simple
+  `git merge --ff-only upstream/main` (see Workflow below) — it's now a real
+  merge/rebase of two histories that have diverged, done by hand, whenever we
+  actively choose to pull something in.
 
-  This branch is meant to be **PR'd back to `QuackbackIO/quackback`**
-  eventually — kept deliberately free of anything Socii-specific so the diff
-  stays clean and mergeable. Rebase it onto `upstream/main` periodically
-  (see Workflow below) rather than letting it drift, since conflicts get
-  harder to resolve the longer it goes unrebased.
-
-- **`socii`** — `i18n-da` plus deployment-only changes that will never go
-  upstream:
+- **`socii`** — `main` plus deployment-only changes that will never go
+  anywhere else, upstream or otherwise:
   - `docker-compose.prod.yml`: binds the app's published port to `127.0.0.1`
     only (nginx on the host terminates TLS and reverse-proxies in).
   - `docker-compose.local.yml`: override file pinning the `app` service to a
-    locally-built image tag instead of the upstream `ghcr.io` image, needed
-    until `i18n-da` lands upstream and ships in an official release.
+    locally-built image tag instead of the upstream `ghcr.io` image (needed
+    for as long as this fork carries any changes not yet in an official
+    upstream release — which, with `main` as our own trunk, is indefinite).
 
   **This is what's actually deployed.**
 
@@ -60,21 +65,36 @@ main ─────────────────────────
   something and a source-level change becomes necessary. If/when that
   happens, those commits belong here.
 
+- **Short-lived feature/fix branches** (`i18n-da`, `fix-pagination-guard`,
+  and whatever comes next) — branch off `main`, do the work, open a PR
+  *within this fork* (`foreningen-sociial/quackback`, base branch `main`) so
+  it goes through the same review/merge UI as any other change, then delete
+  the branch once merged. Cherry-pick or rebase the same commits into
+  `socii`/`theme` to actually deploy them (`main` merging doesn't deploy
+  anything by itself — see "Deploying a change" below).
+
+  As of this writing: `fix-pagination-guard` has been merged into `main` via
+  PR #1. `i18n-da` (the Danish locale) is still open — same process, still
+  pending.
+
 ## Workflow: pulling in upstream updates
 
-Do this periodically, and always before starting new work on `theme` (a short
-branch is much cheaper to rebase than one with weeks of accumulated commits):
+Since `main` is no longer a mirror, this is a deliberate, occasional action —
+not something to run reflexively. Do it when there's a specific upstream fix
+or feature worth having, or before starting substantial new work on `theme`
+(a short gap since the last sync is much cheaper to reconcile than a long one):
 
 ```bash
 git fetch upstream
-git checkout main && git merge --ff-only upstream/main && git push origin main:main
-
-git checkout i18n-da
-git rebase upstream/main            # resolve any conflicts
-git push --force-with-lease origin i18n-da:i18n-da
+git checkout main
+git merge upstream/main        # or: git rebase upstream/main, if you'd rather
+                                # replay our commits on top — either is fine
+                                # now that main isn't required to fast-forward
+# resolve any conflicts
+git push origin main:main
 
 git checkout socii
-git rebase --onto i18n-da <old-i18n-da-tip> socii
+git rebase --onto main <old-main-tip> socii
 git push --force-with-lease origin socii:socii
 
 git checkout theme
@@ -82,11 +102,11 @@ git rebase --onto socii <old-socii-tip> theme
 git push --force-with-lease origin theme:theme
 ```
 
-The `--onto` rebases (rather than plain `git rebase <branch>`) are
-deliberate: a plain `git rebase i18n-da` while on `socii` re-diffs against
-the merge-base of *old* `socii` and *new* `i18n-da`, which re-plays commits
-that are already incorporated and produces spurious conflicts. `--onto`
-tells git exactly which commits are unique to the branch being rebased.
+The `--onto` rebases for `socii`/`theme` are deliberate: a plain
+`git rebase main` while on `socii` re-diffs against the merge-base of *old*
+`socii` and *new* `main`, which re-plays commits that are already
+incorporated and produces spurious conflicts. `--onto` tells git exactly
+which commits are unique to the branch being rebased.
 
 ## Deploying a change
 
@@ -113,6 +133,8 @@ without needing a rebuild.
 ## Where this runs
 
 Landing box `204.168.196.134`, `/srv/sites/quackback` (this repo, checked
-out on `socii`), fronted by nginx + Let's Encrypt at `roadmap.socii.dk`.
-Co-located on the same box (unrelated to Quackback): a Ghost blog and an
-OpenProject instance for `foreningen-sociial.dk`.
+out on `socii`), fronted by nginx + Let's Encrypt at `forslag.socii.dk`
+(moved from `roadmap.socii.dk` — the old domain's vhost and cert were fully
+removed, not redirected). Co-located on the same box (unrelated to
+Quackback): a Ghost blog and an OpenProject instance for
+`foreningen-sociial.dk`.
