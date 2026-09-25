@@ -46,7 +46,7 @@ export const RoadmapColumn = memo(function RoadmapColumn({
     useRoadmapPostsByRoadmap({ roadmapId, statusId, bucketId, filters })
 
   const posts = flattenRoadmapViewPosts(data)
-  const total = data?.pages[0]?.total ?? 0
+  const total = data?.pages?.[0]?.total ?? 0
 
   const sentinelRef = useInfiniteScroll({
     hasMore: hasNextPage,
