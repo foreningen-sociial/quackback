@@ -123,7 +123,12 @@ function updatePostInLists(
   queryClient.setQueriesData<InfiniteData<InboxPostListResult>>(
     { queryKey: inboxKeys.lists() },
     (old) => {
-      if (!old) return old
+      // inboxKeys.facetCounts() is deliberately nested under inboxKeys.lists()
+      // (so invalidating the list also refreshes counts), which means this
+      // broad, prefix-matching setQueriesData call also hits the facet-counts
+      // cache entry — a plain counts object, not InfiniteData. Skip anything
+      // that isn't actually paginated instead of assuming every match has .pages.
+      if (!old || !Array.isArray(old.pages)) return old
       return {
         ...old,
         pages: old.pages.map((page) => ({
@@ -634,7 +639,9 @@ export function useDeletePost() {
       queryClient.setQueriesData<InfiniteData<InboxPostListResult>>(
         { queryKey: inboxKeys.lists() },
         (old) => {
-          if (!old) return old
+          // See updatePostInLists() above — this predicate also matches the
+          // non-paginated facetCounts entry nested under the same prefix.
+          if (!old || !Array.isArray(old.pages)) return old
           return {
             ...old,
             pages: old.pages.map((page) => ({
@@ -668,7 +675,9 @@ export function useRestorePost() {
       queryClient.setQueriesData<InfiniteData<InboxPostListResult>>(
         { queryKey: inboxKeys.lists() },
         (old) => {
-          if (!old) return old
+          // See updatePostInLists() in posts.ts — this predicate also matches
+          // the non-paginated facetCounts entry nested under the same prefix.
+          if (!old || !Array.isArray(old.pages)) return old
           return {
             ...old,
             pages: old.pages.map((page) => ({

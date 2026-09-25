@@ -181,6 +181,6 @@ export function usePostDetail({ postId, enabled = true }: UsePostDetailOptions) 
 export function flattenInboxPosts(
   data: InfiniteData<InboxPostListResult> | undefined
 ): PostListItem[] {
-  if (!data) return []
+  if (!data?.pages) return []
   return data.pages.flatMap((page) => page.items)
 }

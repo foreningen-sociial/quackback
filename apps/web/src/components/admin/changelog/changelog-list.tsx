@@ -90,7 +90,7 @@ export function ChangelogList() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const allEntries = data?.pages.flatMap((page) => page.items) ?? []
+  const allEntries = data?.pages?.flatMap((page) => page.items) ?? []
 
   // Client-side search filtering
   const entries = useMemo(() => {

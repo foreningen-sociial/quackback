@@ -136,7 +136,7 @@ function LiveHelpCenterFinder({
     threshold: 0.1,
   })
 
-  const articles = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data])
+  const articles = useMemo(() => data?.pages?.flatMap((page) => page.items) ?? [], [data])
 
   const headerActions = currentCategory ? (
     <div className="flex items-center gap-1">
@@ -301,7 +301,7 @@ function DeletedItemsView() {
     ...helpCenterQueries.articleList({ showDeleted: true }),
   })
 
-  const deletedArticles = deletedArticlesData?.pages.flatMap((p) => p.items) ?? []
+  const deletedArticles = deletedArticlesData?.pages?.flatMap((p) => p.items) ?? []
 
   const restoreCategoryMutation = useRestoreCategory()
   const restoreArticleMutation = useRestoreArticle()

@@ -173,6 +173,6 @@ export function useTotalUserCount(lifecycle: 'users' | 'leads' = 'users') {
 export function flattenUsers(
   data: InfiniteData<PortalUserListResultView> | undefined
 ): PortalUserListItemView[] {
-  if (!data) return []
+  if (!data?.pages) return []
   return data.pages.flatMap((page) => page.items)
 }

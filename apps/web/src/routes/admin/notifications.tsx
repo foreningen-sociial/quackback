@@ -72,9 +72,9 @@ function NotificationsPage() {
   const archiveNotification = useArchiveNotification()
   const archiveAllRead = useArchiveAllReadNotifications()
 
-  const notifications = data?.pages.flatMap((page) => page.notifications) ?? []
-  const unreadCount = data?.pages[0]?.unreadCount ?? 0
-  const total = data?.pages[0]?.total ?? 0
+  const notifications = data?.pages?.flatMap((page) => page.notifications) ?? []
+  const unreadCount = data?.pages?.[0]?.unreadCount ?? 0
+  const total = data?.pages?.[0]?.total ?? 0
   const groups = groupNotificationsByDate(notifications)
 
   return (

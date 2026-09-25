@@ -134,7 +134,7 @@ export function UsersContainer({ currentMemberRole }: UsersContainerProps) {
     staleTime: 30_000,
     placeholderData: keepPreviousData,
   })
-  const companies = companyPages?.pages.flatMap((p) => p.items)
+  const companies = companyPages?.pages?.flatMap((p) => p.items)
   // Unfiltered total for the nav badge — a cheap dedicated count query rather
   // than a second full-list fetch.
   const { data: companyCount } = useQuery({
@@ -344,7 +344,7 @@ export function UsersContainer({ currentMemberRole }: UsersContainerProps) {
             onFiltersChange={setFilters}
             hasActiveFilters={hasActiveFilters}
             onClearFilters={clearFilters}
-            total={usersData?.pages[0]?.total ?? 0}
+            total={usersData?.pages?.[0]?.total ?? 0}
             segments={segments}
             selectedSegmentIds={filters.segmentIds ?? []}
             onSelectSegment={handleSelectSegment}

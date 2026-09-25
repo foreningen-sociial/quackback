@@ -27,7 +27,7 @@ interface WidgetChangelogTeaserProps {
  */
 export function WidgetChangelogTeaser({ onOpenEntry, onSeeAll }: WidgetChangelogTeaserProps) {
   const { data } = useInfiniteQuery(publicChangelogQueries.list())
-  const latest = data?.pages[0]?.items[0]
+  const latest = data?.pages?.[0]?.items[0]
   if (!latest) return null
 
   return (
