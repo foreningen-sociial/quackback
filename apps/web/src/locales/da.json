@@ -397,6 +397,7 @@
   "portal.auth.sso.usesSSONamed": "{workspace} bruger single sign-on til jeres teamdomæne.",
   "portal.auth.sso.usesSSO": "Dit teamdomæne bruger single sign-on.",
   "portal.auth.sso.continue": "Fortsæt med SSO",
+  "portal.auth.sso.continueWith": "Fortsæt med {provider}",
   "portal.auth.sso.another": "Log ind på en anden måde",
   "portal.auth.linkConflict.title": "Du har allerede en konto",
   "portal.auth.linkConflict.body": "For at beholde din historik og forbinde {provider} til den, skal du bekræfte din e-mail. Vi sender dig et login-link og en kode. Når det er bekræftet, virker {provider} hver gang.",
