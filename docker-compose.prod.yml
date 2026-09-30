@@ -47,7 +47,7 @@ services:
       # serve uploads through the app's /api/storage proxy.
       S3_PROXY: 'true'
     ports:
-      - '${APP_PORT:-3000}:3000'
+      - '127.0.0.1:${APP_PORT:-3000}:3000'
     depends_on:
       postgres:
         condition: service_healthy
