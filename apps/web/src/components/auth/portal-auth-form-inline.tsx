@@ -1081,7 +1081,20 @@ export function PortalAuthFormInline({
           ) : (
             <>
               <ShieldCheckIcon className="mr-2 h-4 w-4" />
-              <FormattedMessage id="portal.auth.sso.continue" defaultMessage="Continue with SSO" />
+              {(() => {
+                const providerName = authConfig?.oidcProviders?.find(
+                  (p) => p.id === view.providerId
+                )?.name
+                return providerName ? (
+                  <FormattedMessage
+                    id="portal.auth.sso.continueWith"
+                    defaultMessage="Continue with {provider}"
+                    values={{ provider: providerName }}
+                  />
+                ) : (
+                  <FormattedMessage id="portal.auth.sso.continue" defaultMessage="Continue with SSO" />
+                )
+              })()}
             </>
           )}
         </Button>
