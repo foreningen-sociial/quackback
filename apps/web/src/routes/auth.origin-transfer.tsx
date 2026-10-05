@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { createServerOnlyFn } from '@tanstack/react-start'
 import { getRequestHeaders, setResponseHeader } from '@tanstack/react-start/server'
 import { z } from 'zod'
+import { FormattedMessage } from 'react-intl'
 import type { OriginTransferResult } from '@/lib/server/functions/origin-transfer'
 
 const searchSchema = z.object({
@@ -51,7 +52,12 @@ function OriginTransferContinue({ to }: { to: string }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <meta httpEquiv="refresh" content={`0;url=${encodeURI(to)}`} />
-      <p className="text-sm text-muted-foreground">Continuing on this address…</p>
+      <p className="text-sm text-muted-foreground">
+        <FormattedMessage
+          id="portal.auth.originTransfer.continuing"
+          defaultMessage="Continuing on this address…"
+        />
+      </p>
       <script
         dangerouslySetInnerHTML={{ __html: `window.location.replace(${JSON.stringify(to)})` }}
       />
@@ -63,16 +69,23 @@ function OriginTransferError() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <section className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
-        <h1 className="text-xl font-semibold">Session transfer expired</h1>
+        <h1 className="text-xl font-semibold">
+          <FormattedMessage
+            id="portal.auth.originTransfer.expiredTitle"
+            defaultMessage="Session transfer expired"
+          />
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sign in at this workspace address to continue. The old address cannot restore this
-          session.
+          <FormattedMessage
+            id="portal.auth.originTransfer.expiredBody"
+            defaultMessage="Sign in at this workspace address to continue. The old address cannot restore this session."
+          />
         </p>
         <Link
           to="/auth/login"
           className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
         >
-          Sign in
+          <FormattedMessage id="portal.auth.signIn" defaultMessage="Sign in" />
         </Link>
       </section>
     </main>

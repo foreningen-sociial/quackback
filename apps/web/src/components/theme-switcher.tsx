@@ -1,17 +1,34 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { ComputerDesktopIcon, MoonIcon, SunIcon } from '@heroicons/react/24/solid'
+import { useIntl } from 'react-intl'
 import { cn } from '@/lib/shared/utils'
 
 const themes = [
-  { value: 'system', label: 'System', icon: ComputerDesktopIcon },
-  { value: 'light', label: 'Light', icon: SunIcon },
-  { value: 'dark', label: 'Dark', icon: MoonIcon },
+  {
+    value: 'system',
+    icon: ComputerDesktopIcon,
+    id: 'portal.settings.preferences.appearance.theme.system',
+    defaultMessage: 'System',
+  },
+  {
+    value: 'light',
+    icon: SunIcon,
+    id: 'portal.settings.preferences.appearance.theme.light',
+    defaultMessage: 'Light',
+  },
+  {
+    value: 'dark',
+    icon: MoonIcon,
+    id: 'portal.settings.preferences.appearance.theme.dark',
+    defaultMessage: 'Dark',
+  },
 ] as const
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const intl = useIntl()
 
   // Avoid hydration mismatch
   useEffect(() => {
@@ -27,7 +44,9 @@ export function ThemeSwitcher() {
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border/50 bg-muted/30"
           >
             <t.icon className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">{t.label}</span>
+            <span className="text-sm text-muted-foreground">
+              {intl.formatMessage({ id: t.id, defaultMessage: t.defaultMessage })}
+            </span>
           </div>
         ))}
       </div>
@@ -50,7 +69,9 @@ export function ThemeSwitcher() {
             )}
           >
             <t.icon className="h-4 w-4" />
-            <span className="text-sm font-medium">{t.label}</span>
+            <span className="text-sm font-medium">
+              {intl.formatMessage({ id: t.id, defaultMessage: t.defaultMessage })}
+            </span>
           </button>
         )
       })}

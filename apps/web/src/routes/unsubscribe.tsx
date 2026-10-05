@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { z } from 'zod'
+import type { ReactNode } from 'react'
+import { FormattedMessage } from 'react-intl'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import {
   processUnsubscribeTokenFn,
@@ -56,7 +58,8 @@ function SuccessView({ result }: { result: UnsubscribeResult }) {
           <p className="text-sm text-muted-foreground">{actionText.message}</p>
           {result.postTitle && (
             <p className="text-sm text-muted-foreground mt-2">
-              Post: <span className="font-medium">{result.postTitle}</span>
+              <FormattedMessage id="portal.unsubscribe.success.postLabel" defaultMessage="Post:" />{' '}
+              <span className="font-medium">{result.postTitle}</span>
             </p>
           )}
         </div>
@@ -68,14 +71,17 @@ function SuccessView({ result }: { result: UnsubscribeResult }) {
               params={{ slug: result.boardSlug, postId: result.postId }}
               className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              View Post
+              <FormattedMessage
+                id="portal.unsubscribe.action.viewPost"
+                defaultMessage="View Post"
+              />
             </Link>
           ) : (
             <Link
               to="/"
               className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              Go to Home
+              <FormattedMessage id="portal.unsubscribe.action.goHome" defaultMessage="Go to Home" />
             </Link>
           )}
         </div>
@@ -106,7 +112,7 @@ function ErrorView({ error }: { error: string }) {
             to="/"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Go to Home
+            <FormattedMessage id="portal.unsubscribe.action.goHome" defaultMessage="Go to Home" />
           </Link>
         </div>
       </div>
@@ -114,67 +120,159 @@ function ErrorView({ error }: { error: string }) {
   )
 }
 
-function getActionText(action?: string): { title: string; message: string } {
+function getActionText(action?: string): { title: ReactNode; message: ReactNode } {
   switch (action) {
     case 'unsubscribe_post':
       return {
-        title: 'Unsubscribed',
-        message:
-          "You've been unsubscribed from this post. You won't receive any more email updates about it.",
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.title.unsubscribed"
+            defaultMessage="Unsubscribed"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.post.message"
+            defaultMessage="You've been unsubscribed from this post. You won't receive any more email updates about it."
+          />
+        ),
       }
     case 'mute_post':
       return {
-        title: 'Notifications Muted',
-        message:
-          "You've muted notifications for this post. You can unmute anytime from the post page.",
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.mutePost.title"
+            defaultMessage="Notifications Muted"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.mutePost.message"
+            defaultMessage="You've muted notifications for this post. You can unmute anytime from the post page."
+          />
+        ),
       }
     case 'unsubscribe_all':
       return {
-        title: 'All Emails Disabled',
-        message:
-          "You've disabled all email notifications. You can re-enable them from your settings.",
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.all.title"
+            defaultMessage="All Emails Disabled"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.all.message"
+            defaultMessage="You've disabled all email notifications. You can re-enable them from your settings."
+          />
+        ),
       }
     case 'unsubscribe_changelog':
       return {
-        title: 'Unsubscribed',
-        message: "You won't receive any more changelog emails. You can resubscribe any time.",
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.title.unsubscribed"
+            defaultMessage="Unsubscribed"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.changelog.message"
+            defaultMessage="You won't receive any more changelog emails. You can resubscribe any time."
+          />
+        ),
       }
     case 'unsubscribe_status':
       return {
-        title: 'Unsubscribed',
-        message: "You won't receive any more status page emails. You can resubscribe any time.",
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.title.unsubscribed"
+            defaultMessage="Unsubscribed"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.status.message"
+            defaultMessage="You won't receive any more status page emails. You can resubscribe any time."
+          />
+        ),
       }
     default:
       return {
-        title: 'Success',
-        message: 'Your preferences have been updated.',
+        title: <FormattedMessage id="portal.unsubscribe.default.title" defaultMessage="Success" />,
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.default.message"
+            defaultMessage="Your preferences have been updated."
+          />
+        ),
       }
   }
 }
 
-function getErrorContent(error: string): { title: string; message: string } {
+function getErrorContent(error: string): { title: ReactNode; message: ReactNode } {
   switch (error) {
     case 'missing':
       return {
-        title: 'Missing Token',
-        message: 'No unsubscribe token was provided. Please use the link from your email.',
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.missingToken.title"
+            defaultMessage="Missing Token"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.missingToken.message"
+            defaultMessage="No unsubscribe token was provided. Please use the link from your email."
+          />
+        ),
       }
     case 'invalid':
     case 'expired':
     case 'used':
       return {
-        title: 'Link Expired',
-        message: 'This unsubscribe link has already been used or has expired.',
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.linkExpired.title"
+            defaultMessage="Link Expired"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.linkExpired.message"
+            defaultMessage="This unsubscribe link has already been used or has expired."
+          />
+        ),
       }
     case 'failed':
       return {
-        title: 'Something Went Wrong',
-        message: "We couldn't process your request. Please try again later.",
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.failed.title"
+            defaultMessage="Something Went Wrong"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.failed.message"
+            defaultMessage="We couldn't process your request. Please try again later."
+          />
+        ),
       }
     default:
       return {
-        title: 'Invalid Link',
-        message: 'This unsubscribe link is not valid. Please use the link from your email.',
+        title: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.invalidLink.title"
+            defaultMessage="Invalid Link"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.unsubscribe.error.invalidLink.message"
+            defaultMessage="This unsubscribe link is not valid. Please use the link from your email."
+          />
+        ),
       }
   }
 }

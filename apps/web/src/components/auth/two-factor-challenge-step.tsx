@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useIntl, FormattedMessage } from 'react-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,10 +16,16 @@ export function TwoFactorChallengeStep({
   onComplete: () => void
   onCancel: () => void
 }): React.ReactElement {
+  const intl = useIntl()
   const [code, setCode] = useState('')
   const [useBackup, setUseBackup] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+
+  const codeRejectedMessage = intl.formatMessage({
+    id: 'portal.auth.twoFactor.codeRejected',
+    defaultMessage: 'Code rejected.',
+  })
 
   async function verifyCode(value: string) {
     if (pending) return
@@ -28,10 +35,10 @@ export function TwoFactorChallengeStep({
       const { error: betterErr } = useBackup
         ? await authClient.twoFactor.verifyBackupCode({ code: value })
         : await authClient.twoFactor.verifyTotp({ code: value })
-      if (betterErr) throw new Error(betterErr.message ?? 'Code rejected.')
+      if (betterErr) throw new Error(betterErr.message ?? codeRejectedMessage)
       onComplete()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Code rejected.')
+      setError(err instanceof Error ? err.message : codeRejectedMessage)
     } finally {
       setPending(false)
     }
@@ -40,9 +47,17 @@ export function TwoFactorChallengeStep({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        {useBackup
-          ? 'Use one of the one-time backup codes you saved during setup.'
-          : 'Open your authenticator app and enter the 6-digit code.'}
+        {useBackup ? (
+          <FormattedMessage
+            id="portal.auth.twoFactor.useBackupCodeHint"
+            defaultMessage="Use one of the one-time backup codes you saved during setup."
+          />
+        ) : (
+          <FormattedMessage
+            id="portal.auth.twoFactor.useAuthenticatorHint"
+            defaultMessage="Open your authenticator app and enter the 6-digit code."
+          />
+        )}
       </p>
       <form
         onSubmit={(e) => {
@@ -52,7 +67,15 @@ export function TwoFactorChallengeStep({
         className="space-y-3"
       >
         <Label htmlFor="tf-challenge" className="sr-only">
-          {useBackup ? 'Backup code' : 'Authenticator code'}
+          {useBackup
+            ? intl.formatMessage({
+                id: 'portal.auth.twoFactor.backupCode',
+                defaultMessage: 'Backup code',
+              })
+            : intl.formatMessage({
+                id: 'portal.auth.twoFactor.authenticatorCode',
+                defaultMessage: 'Authenticator code',
+              })}
         </Label>
         {useBackup ? (
           <Input
@@ -75,7 +98,10 @@ export function TwoFactorChallengeStep({
               disabled={pending}
               autoFocus
               autoComplete="one-time-code"
-              aria-label="Authenticator code"
+              aria-label={intl.formatMessage({
+                id: 'portal.auth.twoFactor.authenticatorCode',
+                defaultMessage: 'Authenticator code',
+              })}
               aria-invalid={!!error || undefined}
             >
               <InputOTPSixSlots />
@@ -89,10 +115,14 @@ export function TwoFactorChallengeStep({
         )}
         <div className="flex gap-2">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
-            Cancel
+            <FormattedMessage id="portal.auth.twoFactor.cancel" defaultMessage="Cancel" />
           </Button>
           <Button type="submit" disabled={pending || !code}>
-            {pending ? 'Verifying…' : 'Continue'}
+            {pending ? (
+              <FormattedMessage id="portal.auth.twoFactor.verifying" defaultMessage="Verifying…" />
+            ) : (
+              <FormattedMessage id="portal.auth.twoFactor.continue" defaultMessage="Continue" />
+            )}
           </Button>
         </div>
       </form>
@@ -105,7 +135,17 @@ export function TwoFactorChallengeStep({
         }}
         className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
       >
-        {useBackup ? 'Use authenticator code instead' : 'Use a backup code instead'}
+        {useBackup ? (
+          <FormattedMessage
+            id="portal.auth.twoFactor.useAuthenticatorInstead"
+            defaultMessage="Use authenticator code instead"
+          />
+        ) : (
+          <FormattedMessage
+            id="portal.auth.twoFactor.useBackupInstead"
+            defaultMessage="Use a backup code instead"
+          />
+        )}
       </button>
     </div>
   )

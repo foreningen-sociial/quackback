@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useIntl } from 'react-intl'
 import { authClient } from '@/lib/client/auth-client'
+import { AUTH_BLOCK_MESSAGES, AUTH_BLOCK_MESSAGE_IDS } from '@/lib/shared/auth-block-messages'
 
 interface UseEmailSigninOptions {
   /** Where the magic link should land after a successful click. */
@@ -39,6 +41,7 @@ export function useEmailSignin({
   callbackUrl,
   onSuccess,
 }: UseEmailSigninOptions): UseEmailSigninResult {
+  const intl = useIntl()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [code, setCode] = useState('')
@@ -46,6 +49,15 @@ export function useEmailSignin({
   // Sticky per-flow override so `resend` re-sends the same kind of email
   // (e.g. a link-conflict recovery link keeps pointing at /auth/link-sso).
   const callbackOverrideRef = useRef<string | null>(null)
+
+  const failedToSendMessage = intl.formatMessage({
+    id: 'portal.auth.emailSignin.failedToSend',
+    defaultMessage: 'Failed to send sign-in email',
+  })
+  const invalidOrExpiredCodeMessage = intl.formatMessage({
+    id: 'portal.auth.emailSignin.invalidOrExpiredCode',
+    defaultMessage: 'Invalid or expired code',
+  })
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -67,13 +79,22 @@ export function useEmailSignin({
         body: JSON.stringify({ email, callbackURL: callbackOverrideRef.current ?? callbackUrl }),
       })
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || 'Failed to send sign-in email')
+        const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+        const messageId = body.code
+          ? AUTH_BLOCK_MESSAGE_IDS[body.code as keyof typeof AUTH_BLOCK_MESSAGE_IDS]
+          : undefined
+        const localized = messageId
+          ? intl.formatMessage({
+              id: messageId,
+              defaultMessage: AUTH_BLOCK_MESSAGES[body.code as keyof typeof AUTH_BLOCK_MESSAGES],
+            })
+          : undefined
+        throw new Error(localized || body.error || failedToSendMessage)
       }
       setResendCooldown(60)
       return { ok: true }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send sign-in email'
+      const message = err instanceof Error ? err.message : failedToSendMessage
       setError(message)
       return { ok: false, error: message }
     } finally {
@@ -89,11 +110,11 @@ export function useEmailSignin({
     try {
       const result = await authClient.signIn.emailOtp({ email, otp })
       if (result.error) {
-        throw new Error(result.error.message || 'Invalid or expired code')
+        throw new Error(result.error.message || invalidOrExpiredCodeMessage)
       }
       await onSuccess()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid or expired code')
+      setError(err instanceof Error ? err.message : invalidOrExpiredCodeMessage)
     } finally {
       // Success has to clear this too. A host that stays mounted after sign-in
       // (the onboarding account step) would otherwise spin forever, and the

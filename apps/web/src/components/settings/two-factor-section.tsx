@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,19 +26,32 @@ export function TwoFactorSection({ enrolled, onChanged }: Props) {
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="text-sm font-semibold">Two-factor authentication</h3>
+        <h3 className="text-sm font-semibold">
+          <FormattedMessage
+            id="portal.settings.profile.twoFactor.heading"
+            defaultMessage="Two-factor authentication"
+          />
+        </h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Adds a 6-digit code from an authenticator app on top of your password. Has no effect on
-          SSO sign-ins.
+          <FormattedMessage
+            id="portal.settings.profile.twoFactor.description"
+            defaultMessage="Adds a 6-digit code from an authenticator app on top of your password. Has no effect on SSO sign-ins."
+          />
         </p>
       </div>
       {enrolled ? (
         <Button variant="outline" size="sm" onClick={() => setDisableOpen(true)}>
-          Disable two-factor
+          <FormattedMessage
+            id="portal.settings.profile.twoFactor.disableButton"
+            defaultMessage="Disable two-factor"
+          />
         </Button>
       ) : (
         <Button size="sm" onClick={() => setSetupOpen(true)}>
-          Set up authenticator
+          <FormattedMessage
+            id="portal.settings.profile.twoFactor.setupButton"
+            defaultMessage="Set up authenticator"
+          />
         </Button>
       )}
       {setupOpen && (
@@ -109,7 +123,10 @@ function PasswordConfirmForm({
       <p className="text-sm text-muted-foreground">{description}</p>
       {inputId && (
         <Label htmlFor={inputId} className="sr-only">
-          Password
+          <FormattedMessage
+            id="portal.settings.profile.twoFactor.passwordLabel"
+            defaultMessage="Password"
+          />
         </Label>
       )}
       <Input
@@ -127,7 +144,7 @@ function PasswordConfirmForm({
       )}
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
-          Cancel
+          <FormattedMessage id="portal.settings.profile.twoFactor.cancel" defaultMessage="Cancel" />
         </Button>
         <Button type="submit" variant={variant} disabled={pending || !password}>
           {pending ? pendingLabel : submitLabel}
@@ -138,6 +155,7 @@ function PasswordConfirmForm({
 }
 
 function SetupDialog({ onClose, onComplete }: { onClose: () => void; onComplete: () => void }) {
+  const intl = useIntl()
   const [step, setStep] = useState<'password' | 'enroll'>('password')
   const [enrollStep, setEnrollStep] = useState<'qr' | 'backup'>('qr')
   const [password, setPassword] = useState('')
@@ -147,23 +165,50 @@ function SetupDialog({ onClose, onComplete }: { onClose: () => void; onComplete:
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {step === 'password' && 'Confirm your password'}
-            {step === 'enroll' && enrollStep === 'qr' && 'Scan with your authenticator'}
-            {step === 'enroll' && enrollStep === 'backup' && 'Save your backup codes'}
+            {step === 'password' &&
+              intl.formatMessage({
+                id: 'portal.settings.profile.twoFactor.setup.confirmPasswordTitle',
+                defaultMessage: 'Confirm your password',
+              })}
+            {step === 'enroll' &&
+              enrollStep === 'qr' &&
+              intl.formatMessage({
+                id: 'portal.settings.profile.twoFactor.setup.scanTitle',
+                defaultMessage: 'Scan with your authenticator',
+              })}
+            {step === 'enroll' &&
+              enrollStep === 'backup' &&
+              intl.formatMessage({
+                id: 'portal.settings.profile.twoFactor.setup.backupTitle',
+                defaultMessage: 'Save your backup codes',
+              })}
           </DialogTitle>
         </DialogHeader>
         {step === 'password' && (
           <PasswordConfirmForm
             inputId="tf-password"
-            description="For your security, re-enter your password to enable two-factor authentication."
+            description={intl.formatMessage({
+              id: 'portal.settings.profile.twoFactor.setup.confirmPasswordDescription',
+              defaultMessage:
+                'For your security, re-enter your password to enable two-factor authentication.',
+            })}
             onCancel={onClose}
             onSubmit={async (pw) => {
               setPassword(pw)
               setStep('enroll')
             }}
-            pendingLabel="Working…"
-            submitLabel="Continue"
-            fallbackError="Could not start 2FA setup."
+            pendingLabel={intl.formatMessage({
+              id: 'portal.settings.profile.twoFactor.setup.working',
+              defaultMessage: 'Working…',
+            })}
+            submitLabel={intl.formatMessage({
+              id: 'portal.settings.profile.twoFactor.setup.continue',
+              defaultMessage: 'Continue',
+            })}
+            fallbackError={intl.formatMessage({
+              id: 'portal.settings.profile.twoFactor.setup.startFailed',
+              defaultMessage: 'Could not start 2FA setup.',
+            })}
           />
         )}
         {step === 'enroll' && (
@@ -180,9 +225,19 @@ function SetupDialog({ onClose, onComplete }: { onClose: () => void; onComplete:
 }
 
 function DisableDialog({ onClose, onComplete }: { onClose: () => void; onComplete: () => void }) {
+  const intl = useIntl()
+
   async function handleDisable(password: string) {
     const { error: betterErr } = await authClient.twoFactor.disable({ password })
-    if (betterErr) throw new Error(betterErr.message ?? 'Could not disable two-factor.')
+    if (betterErr) {
+      throw new Error(
+        betterErr.message ??
+          intl.formatMessage({
+            id: 'portal.settings.profile.twoFactor.disable.failed',
+            defaultMessage: 'Could not disable two-factor.',
+          })
+      )
+    }
     onComplete()
   }
 
@@ -190,15 +245,33 @@ function DisableDialog({ onClose, onComplete }: { onClose: () => void; onComplet
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Disable two-factor authentication?</DialogTitle>
+          <DialogTitle>
+            <FormattedMessage
+              id="portal.settings.profile.twoFactor.disable.title"
+              defaultMessage="Disable two-factor authentication?"
+            />
+          </DialogTitle>
         </DialogHeader>
         <PasswordConfirmForm
-          description="Confirm your password to disable two-factor. Your authenticator will stop working immediately."
+          description={intl.formatMessage({
+            id: 'portal.settings.profile.twoFactor.disable.description',
+            defaultMessage:
+              'Confirm your password to disable two-factor. Your authenticator will stop working immediately.',
+          })}
           onCancel={onClose}
           onSubmit={handleDisable}
-          pendingLabel="Disabling…"
-          submitLabel="Disable"
-          fallbackError="Could not disable two-factor."
+          pendingLabel={intl.formatMessage({
+            id: 'portal.settings.profile.twoFactor.disable.disabling',
+            defaultMessage: 'Disabling…',
+          })}
+          submitLabel={intl.formatMessage({
+            id: 'portal.settings.profile.twoFactor.disable.confirm',
+            defaultMessage: 'Disable',
+          })}
+          fallbackError={intl.formatMessage({
+            id: 'portal.settings.profile.twoFactor.disable.failed',
+            defaultMessage: 'Could not disable two-factor.',
+          })}
           variant="destructive"
         />
       </DialogContent>

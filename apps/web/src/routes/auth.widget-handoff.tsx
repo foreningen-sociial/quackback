@@ -40,6 +40,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { createServerFn, createServerOnlyFn } from '@tanstack/react-start'
 import { getRequestHeaders, setResponseHeader } from '@tanstack/react-start/server'
 import { z } from 'zod'
+import { FormattedMessage } from 'react-intl'
 import { isSafeCallbackUrl } from '@/lib/shared/routing'
 import type { UserId } from '@quackback/ids'
 
@@ -311,11 +312,24 @@ function WidgetHandoffErrorPage() {
   return (
     <PageShell>
       <Card>
-        <h1 className="text-xl font-semibold tracking-tight">Sign-in link expired</h1>
+        <h1 className="text-xl font-semibold tracking-tight">
+          <FormattedMessage
+            id="portal.auth.widgetHandoff.expiredTitle"
+            defaultMessage="Sign-in link expired"
+          />
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {data.status === 'error'
-            ? 'Something went wrong while processing your sign-in link. Please reopen the widget and try again.'
-            : 'This sign-in link has expired or has already been used. Please reopen the widget to get a new link.'}
+          {data.status === 'error' ? (
+            <FormattedMessage
+              id="portal.auth.widgetHandoff.processingError"
+              defaultMessage="Something went wrong while processing your sign-in link. Please reopen the widget and try again."
+            />
+          ) : (
+            <FormattedMessage
+              id="portal.auth.widgetHandoff.expiredBody"
+              defaultMessage="This sign-in link has expired or has already been used. Please reopen the widget to get a new link."
+            />
+          )}
         </p>
       </Card>
     </PageShell>

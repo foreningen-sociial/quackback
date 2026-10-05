@@ -2,6 +2,7 @@
 
 import { Link } from '@tanstack/react-router'
 import { formatDistanceToNow, isToday, format } from 'date-fns'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { ArchiveBoxIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/shared/utils'
 import { Avatar } from '@/components/ui/avatar'
@@ -211,10 +212,13 @@ function CompactContent({ notification, icon: Icon, iconClass, bgClass, isUnread
       />
 
       <div className="flex-1 min-w-0 space-y-0.5">
-        {/* The dot below is aria-hidden, so this plain-English label is the
-            only unread signal exposed to screen readers. Both surfaces share
-            this component, so full i18n of the row is out of scope here. */}
-        {isUnread && <span className="sr-only">Unread</span>}
+        {/* The dot below is aria-hidden, so this label is the only unread
+            signal exposed to screen readers. */}
+        {isUnread && (
+          <span className="sr-only">
+            <FormattedMessage id="portal.notifications.item.unread" defaultMessage="Unread" />
+          </span>
+        )}
         <p className={cn('text-sm leading-tight', isUnread ? 'font-medium' : 'text-foreground')}>
           {notification.title}
         </p>
@@ -245,6 +249,7 @@ function FullContent({
   isUnread,
   onArchive,
 }: ContentProps) {
+  const intl = useIntl()
   const createdAt = new Date(notification.createdAt)
 
   function handleArchiveClick(event: React.MouseEvent<HTMLButtonElement>): void {
@@ -280,11 +285,13 @@ function FullContent({
       {/* End padding reserves room for the absolutely-positioned unread dot
           and archive button so long titles never run underneath them. */}
       <div className="flex-1 min-w-0 pe-14">
-        {/* The accent bar and dot are aria-hidden, so this plain-English
-            label is the only unread signal exposed to screen readers. Both
-            surfaces share this component, so full i18n of the row is out of
-            scope here. */}
-        {isUnread && <span className="sr-only">Unread</span>}
+        {/* The accent bar and dot are aria-hidden, so this label is the
+            only unread signal exposed to screen readers. */}
+        {isUnread && (
+          <span className="sr-only">
+            <FormattedMessage id="portal.notifications.item.unread" defaultMessage="Unread" />
+          </span>
+        )}
         <p className={cn('text-sm leading-tight', isUnread ? 'font-medium' : 'text-foreground')}>
           {notification.title}
         </p>
@@ -327,7 +334,10 @@ function FullContent({
           variant="ghost"
           size="icon"
           onClick={handleArchiveClick}
-          aria-label="Archive notification"
+          aria-label={intl.formatMessage({
+            id: 'portal.notifications.item.archiveAria',
+            defaultMessage: 'Archive notification',
+          })}
           className={cn(
             'absolute end-2 top-2 h-7 w-7',
             'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-within:opacity-100',

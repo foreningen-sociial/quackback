@@ -58,12 +58,20 @@ function WorkspaceStep() {
 function CloudIdentityUnavailable() {
   return (
     <div className="mx-auto max-w-lg space-y-5 text-center">
-      <h1 className="text-2xl font-bold">Workspace details are temporarily unavailable</h1>
+      <h1 className="text-2xl font-bold">
+        <FormattedMessage
+          id="onboarding.workspace.cloudIdentityUnavailableTitle"
+          defaultMessage="Workspace details are temporarily unavailable"
+        />
+      </h1>
       <p className="text-sm text-muted-foreground">
-        Your workspace is ready, but its verified cloud identity has not arrived yet.
+        <FormattedMessage
+          id="onboarding.workspace.cloudIdentityUnavailableBody"
+          defaultMessage="Your workspace is ready, but its verified cloud identity has not arrived yet."
+        />
       </p>
       <Button type="button" onClick={() => window.location.reload()}>
-        Retry
+        <FormattedMessage id="onboarding.workspace.retry" defaultMessage="Retry" />
       </Button>
     </div>
   )
@@ -105,6 +113,7 @@ export function CloudWorkspaceDetailsForm(props: {
   identity: NonNullable<Awaited<ReturnType<typeof getCloudIdentityFn>>>
   onSave: (input: { displayName: string; platformLabel: string }) => Promise<void>
 }) {
+  const intl = useIntl()
   const [displayName, setDisplayName] = useState(props.identity.displayName)
   const [platformLabel, setPlatformLabel] = useState(
     friendlyPlatformLabel(props.identity.platformHostname)
@@ -131,23 +140,33 @@ export function CloudWorkspaceDetailsForm(props: {
     if (!name || !friendlyLabel) return
     void run(
       () => props.onSave({ displayName: name, platformLabel: friendlyLabel }),
-      'Could not save workspace details. Try again.'
+      intl.formatMessage({
+        id: 'onboarding.workspace.cloudSaveFailed',
+        defaultMessage: 'Could not save workspace details. Try again.',
+      })
     )
   }
 
   return (
     <form onSubmit={submit} className="mx-auto flex w-full max-w-xl flex-col gap-7 pb-24 sm:pb-0">
       <header className="text-center">
-        <h1 className="text-2xl font-bold">Make this workspace yours</h1>
+        <h1 className="text-2xl font-bold">
+          <FormattedMessage
+            id="onboarding.workspace.cloudTitle"
+            defaultMessage="Make this workspace yours"
+          />
+        </h1>
         <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-          Choose a name and the address customers will use. You can change these later in Admin
-          Settings.
+          <FormattedMessage
+            id="onboarding.workspace.cloudDescription"
+            defaultMessage="Choose a name and the address customers will use. You can change these later in Admin Settings."
+          />
         </p>
       </header>
 
       <div className="space-y-2">
         <label htmlFor="cloud-workspace-name" className="text-sm font-medium">
-          Workspace name
+          <FormattedMessage id="onboarding.workspace.name" defaultMessage="Workspace name" />
         </label>
         <Input
           id="cloud-workspace-name"
@@ -162,7 +181,7 @@ export function CloudWorkspaceDetailsForm(props: {
 
       <div className="space-y-2">
         <label htmlFor="cloud-platform-label" className="text-sm font-medium">
-          Workspace URL
+          <FormattedMessage id="onboarding.workspace.url" defaultMessage="Workspace URL" />
         </label>
         <div className="flex items-center rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring">
           <Input
@@ -174,7 +193,10 @@ export function CloudWorkspaceDetailsForm(props: {
             autoCapitalize="none"
             autoCorrect="off"
             disabled={isSaving}
-            placeholder="your-team"
+            placeholder={intl.formatMessage({
+              id: 'onboarding.workspace.urlPlaceholder',
+              defaultMessage: 'your-team',
+            })}
             required
           />
           <span className="shrink-0 pe-3 text-sm text-muted-foreground">.{domainSuffix}</span>
@@ -199,7 +221,7 @@ export function CloudWorkspaceDetailsForm(props: {
           {isSaving && (
             <ArrowPathIcon className="h-4 w-4 animate-spin motion-reduce:animate-none" />
           )}
-          Continue
+          <FormattedMessage id="onboarding.continue" defaultMessage="Continue" />
         </Button>
       </div>
     </form>

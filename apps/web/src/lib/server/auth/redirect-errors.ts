@@ -19,13 +19,17 @@
  * error code) so the wording stays in one place.
  */
 import { ForbiddenError } from '@/lib/shared/errors'
-import { AUTH_BLOCK_MESSAGES, type AuthBlockCode } from '@/lib/shared/auth-block-messages'
+import {
+  AUTH_BLOCK_MESSAGES,
+  AUTH_BLOCK_MESSAGE_IDS,
+  type AuthBlockCode,
+} from '@/lib/shared/auth-block-messages'
 
 // The code union + message map live in `@/lib/shared/auth-block-messages`
 // so client-bundled route files can render them without importing server
 // code. Re-exported here so existing server/component importers keep one
 // canonical path.
-export { AUTH_BLOCK_MESSAGES, type AuthBlockCode }
+export { AUTH_BLOCK_MESSAGES, AUTH_BLOCK_MESSAGE_IDS, type AuthBlockCode }
 
 /**
  * 403 domain error for pre-check denials. Extending `ForbiddenError`

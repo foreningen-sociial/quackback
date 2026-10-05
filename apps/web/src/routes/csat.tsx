@@ -8,8 +8,9 @@
  * click is the write signal, exactly like the widget's own CSAT block.
  */
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { z } from 'zod'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { recordCsatViaTokenFn, validateCsatEmailTokenFn } from '@/lib/server/functions/csat-email'
 import { CSAT_FACES } from '@/lib/shared/db-types'
@@ -53,6 +54,7 @@ function CsatPage() {
  *  covers the rating-then-comment follow-up, same as the widget's own
  *  two-POST CSAT flow). */
 function RateView({ token, linkedRating }: { token: string; linkedRating?: number }) {
+  const intl = useIntl()
   const preselected =
     linkedRating && Number.isInteger(linkedRating) && linkedRating >= 1 && linkedRating <= 5
       ? linkedRating
@@ -109,10 +111,27 @@ function RateView({ token, linkedRating }: { token: string; linkedRating?: numbe
 
         <div className="text-center space-y-2">
           <h1 className="text-xl font-semibold text-foreground">
-            {recorded ? 'Thanks for the feedback' : 'How did we do?'}
+            {recorded ? (
+              <FormattedMessage
+                id="portal.csat.title.thanks"
+                defaultMessage="Thanks for the feedback"
+              />
+            ) : (
+              <FormattedMessage id="portal.csat.title.howDidWeDo" defaultMessage="How did we do?" />
+            )}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {recorded ? 'Your rating has been recorded.' : 'Tap a face to confirm your rating.'}
+            {recorded ? (
+              <FormattedMessage
+                id="portal.csat.subtitle.recorded"
+                defaultMessage="Your rating has been recorded."
+              />
+            ) : (
+              <FormattedMessage
+                id="portal.csat.subtitle.prompt"
+                defaultMessage="Tap a face to confirm your rating."
+              />
+            )}
           </p>
         </div>
 
@@ -127,7 +146,10 @@ function RateView({ token, linkedRating }: { token: string; linkedRating?: numbe
                     type="button"
                     disabled={submitting}
                     onClick={() => rate(rating)}
-                    aria-label={`Rate ${rating} of 5`}
+                    aria-label={intl.formatMessage(
+                      { id: 'portal.csat.face.ariaLabel', defaultMessage: 'Rate {rating} of 5' },
+                      { rating }
+                    )}
                     className={cn(
                       'flex h-12 w-12 items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 disabled:opacity-40',
                       preselected === rating ? 'bg-primary/10 ring-2 ring-ring' : 'hover:bg-muted'
@@ -140,7 +162,10 @@ function RateView({ token, linkedRating }: { token: string; linkedRating?: numbe
             </div>
             {rateError && (
               <p className="text-center text-sm text-red-600 dark:text-red-400">
-                Something went wrong. Please try again.
+                <FormattedMessage
+                  id="portal.csat.error.generic"
+                  defaultMessage="Something went wrong. Please try again."
+                />
               </p>
             )}
           </div>
@@ -152,12 +177,18 @@ function RateView({ token, linkedRating }: { token: string; linkedRating?: numbe
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               maxLength={2000}
-              placeholder="Anything you'd like to add? (optional)"
+              placeholder={intl.formatMessage({
+                id: 'portal.csat.comment.placeholder',
+                defaultMessage: "Anything you'd like to add? (optional)",
+              })}
               className="min-h-24"
             />
             {commentError && (
               <p className="text-center text-sm text-red-600 dark:text-red-400">
-                Something went wrong. Please try again.
+                <FormattedMessage
+                  id="portal.csat.error.generic"
+                  defaultMessage="Something went wrong. Please try again."
+                />
               </p>
             )}
             <div className="flex justify-center">
@@ -166,7 +197,11 @@ function RateView({ token, linkedRating }: { token: string; linkedRating?: numbe
                 onClick={submitComment}
                 disabled={!comment.trim() || submitting}
               >
-                {submitting ? 'Sending…' : 'Send comment'}
+                {submitting ? (
+                  <FormattedMessage id="portal.csat.comment.sending" defaultMessage="Sending…" />
+                ) : (
+                  <FormattedMessage id="portal.csat.comment.send" defaultMessage="Send comment" />
+                )}
               </Button>
             </div>
           </div>
@@ -174,7 +209,10 @@ function RateView({ token, linkedRating }: { token: string; linkedRating?: numbe
 
         {commentSaved && (
           <p className="text-center text-sm text-muted-foreground">
-            Thanks, your comment has been added.
+            <FormattedMessage
+              id="portal.csat.comment.thanks"
+              defaultMessage="Thanks, your comment has been added."
+            />
           </p>
         )}
       </div>
@@ -203,18 +241,38 @@ function ErrorView({ error }: { error: string }) {
   )
 }
 
-function getErrorContent(error: string): { title: string; message: string } {
+function getErrorContent(error: string): { title: ReactNode; message: ReactNode } {
   switch (error) {
     case 'missing':
       return {
-        title: 'Missing Link',
-        message: 'This link is missing some information. Please use the link from your email.',
+        title: (
+          <FormattedMessage
+            id="portal.csat.error.missingLink.title"
+            defaultMessage="Missing Link"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.csat.error.missingLink.message"
+            defaultMessage="This link is missing some information. Please use the link from your email."
+          />
+        ),
       }
     case 'invalid':
     default:
       return {
-        title: 'Link Expired',
-        message: 'This rating link has expired or is no longer valid.',
+        title: (
+          <FormattedMessage
+            id="portal.csat.error.expiredLink.title"
+            defaultMessage="Link Expired"
+          />
+        ),
+        message: (
+          <FormattedMessage
+            id="portal.csat.error.expiredLink.message"
+            defaultMessage="This rating link has expired or is no longer valid."
+          />
+        ),
       }
   }
 }

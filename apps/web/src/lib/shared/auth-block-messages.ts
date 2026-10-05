@@ -106,3 +106,50 @@ export const AUTH_BLOCK_MESSAGES: Record<AuthBlockCode, string> = {
   handoff_failed:
     'That workspace handoff expired or was already used. Sign in here, or reopen the workspace from Quackback.',
 }
+
+/**
+ * react-intl message id for each code's catalog entry. Several codes share
+ * near-identical English text (e.g. the two OAuth-callback-rejection codes,
+ * or the three "couldn't verify with your IdP" codes) and are intentionally
+ * mapped to the same id so the translated string only has to be maintained
+ * once.
+ *
+ * UI code that renders one of these messages to a signed-out visitor should
+ * look up the id here and call `intl.formatMessage`, not read
+ * `AUTH_BLOCK_MESSAGES` directly — that map is still consumed as-is by
+ * server code that embeds English text into non-rendered contexts (API
+ * error payloads, redirect fallback text).
+ */
+export const AUTH_BLOCK_MESSAGE_IDS: Record<AuthBlockCode, string> = {
+  password_method_not_allowed: 'portal.auth.error.passwordMethodNotAllowed',
+  magic_link_method_not_allowed: 'portal.auth.error.magicLinkMethodNotAllowed',
+  oauth_method_not_allowed: 'portal.auth.error.oauthMethodNotAllowed',
+  auth_method_blocked: 'portal.auth.error.authMethodBlocked',
+  rate_limited: 'portal.auth.error.rateLimited',
+  reserved_email_domain: 'portal.auth.error.reservedEmailDomain',
+  verified_domain_requires_sso: 'portal.auth.error.verifiedDomainRequiresSso',
+  require_two_factor: 'portal.auth.error.requireTwoFactor',
+  token_expired: 'portal.auth.error.tokenExpired',
+  invalid_token: 'portal.auth.error.invalidToken',
+  signup_disabled: 'portal.auth.error.signupDisabled',
+  signup_not_allowed: 'portal.auth.error.signupNotAllowed',
+  OAUTH_CALLBACK_ERROR: 'portal.auth.error.oauthCallbackError',
+  oauth_signin_error: 'portal.auth.error.oauthCallbackError',
+  not_team_member: 'portal.auth.error.notTeamMember',
+  account_not_linked: 'portal.auth.error.accountNotLinked',
+  "email_doesn't_match": 'portal.auth.error.emailDoesntMatch',
+  account_already_linked_to_different_user: 'portal.auth.error.accountAlreadyLinkedToDifferentUser',
+  unable_to_link_account: 'portal.auth.error.unableToLinkAccount',
+  email_is_missing: 'portal.auth.error.emailMissing',
+  email_not_found: 'portal.auth.error.emailMissing',
+  state_mismatch: 'portal.auth.error.signinAttemptExpired',
+  please_restart_the_process: 'portal.auth.error.signinAttemptExpired',
+  oauth_code_verification_failed: 'portal.auth.error.verificationFailed',
+  invalid_code: 'portal.auth.error.verificationFailed',
+  no_code: 'portal.auth.error.verificationFailed',
+  unable_to_create_user: 'portal.auth.error.unableToCreateUser',
+  failed_to_create_user: 'portal.auth.error.failedToCreateUser',
+  unable_to_create_session: 'portal.auth.error.unableToCreateSession',
+  oauth_provider_not_found: 'portal.auth.error.oauthProviderNotFound',
+  handoff_failed: 'portal.auth.error.handoffFailed',
+}

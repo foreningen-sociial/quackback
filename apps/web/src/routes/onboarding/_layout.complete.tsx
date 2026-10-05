@@ -137,7 +137,10 @@ function LaunchPreview({ tasks }: { tasks: LaunchTask[] }) {
             </span>
             {task.availability === 'blocked' && (
               <Badge size="sm" shape="pill" variant="outline" className="ml-auto">
-                Needs attention
+                <FormattedMessage
+                  id="onboarding.complete.needsAttention"
+                  defaultMessage="Needs attention"
+                />
               </Badge>
             )}
           </li>
@@ -148,11 +151,15 @@ function LaunchPreview({ tasks }: { tasks: LaunchTask[] }) {
 }
 
 function PreviewMark({ status }: { status: 'done' | 'current' | 'pending' }) {
+  const intl = useIntl()
   if (status === 'done') {
     return (
       <span
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
-        aria-label="Done"
+        aria-label={intl.formatMessage({
+          id: 'onboarding.complete.taskDone',
+          defaultMessage: 'Done',
+        })}
       >
         <CheckIcon className="h-3 w-3" />
       </span>
@@ -162,9 +169,20 @@ function PreviewMark({ status }: { status: 'done' | 'current' | 'pending' }) {
     return (
       <span
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-primary/10"
-        aria-label="Up next"
+        aria-label={intl.formatMessage({
+          id: 'onboarding.complete.taskUpNext',
+          defaultMessage: 'Up next',
+        })}
       />
     )
   }
-  return <span className="h-5 w-5 shrink-0 rounded-full border border-border" aria-label="Later" />
+  return (
+    <span
+      className="h-5 w-5 shrink-0 rounded-full border border-border"
+      aria-label={intl.formatMessage({
+        id: 'onboarding.complete.taskLater',
+        defaultMessage: 'Later',
+      })}
+    />
+  )
 }

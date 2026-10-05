@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { useIntl, FormattedMessage } from 'react-intl'
 import { postAuthSuccess, postAuthError } from '@/lib/client/hooks/use-auth-broadcast'
-import { AUTH_BLOCK_MESSAGES } from '@/lib/shared/auth-block-messages'
+import { AUTH_BLOCK_MESSAGES, AUTH_BLOCK_MESSAGE_IDS } from '@/lib/shared/auth-block-messages'
 import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/solid'
 
 /**
@@ -25,6 +26,7 @@ export const Route = createFileRoute('/auth/auth-complete')({
 
 function AuthCompletePage() {
   const { error } = Route.useSearch()
+  const intl = useIntl()
   const [status, setStatus] = useState<'broadcasting' | 'success' | 'error'>('broadcasting')
 
   useEffect(() => {
@@ -61,25 +63,63 @@ function AuthCompletePage() {
         {status === 'broadcasting' && (
           <>
             <ArrowPathIcon className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <p className="text-muted-foreground">Completing sign in...</p>
+            <p className="text-muted-foreground">
+              <FormattedMessage
+                id="portal.auth.authComplete.completing"
+                defaultMessage="Completing sign in..."
+              />
+            </p>
           </>
         )}
         {status === 'success' && (
           <>
             <CheckCircleIcon className="h-12 w-12 text-green-500 mx-auto" />
-            <p className="text-foreground font-medium">Signed in successfully!</p>
-            <p className="text-sm text-muted-foreground">This window will close automatically.</p>
+            <p className="text-foreground font-medium">
+              <FormattedMessage
+                id="portal.auth.authComplete.success"
+                defaultMessage="Signed in successfully!"
+              />
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <FormattedMessage
+                id="portal.auth.authComplete.willClose"
+                defaultMessage="This window will close automatically."
+              />
+            </p>
           </>
         )}
         {status === 'error' && (
           <>
             <ExclamationTriangleIcon className="h-12 w-12 text-amber-500 mx-auto" />
-            <p className="text-foreground font-medium">Sign-in didn&apos;t complete</p>
-            <p className="text-sm text-muted-foreground">
-              {AUTH_BLOCK_MESSAGES[error as keyof typeof AUTH_BLOCK_MESSAGES] ??
-                'Sign-in failed. Return to the original window and try again.'}
+            <p className="text-foreground font-medium">
+              <FormattedMessage
+                id="portal.auth.authComplete.notComplete"
+                defaultMessage="Sign-in didn't complete"
+              />
             </p>
-            <p className="text-sm text-muted-foreground">This window will close automatically.</p>
+            <p className="text-sm text-muted-foreground">
+              {(() => {
+                const messageId =
+                  AUTH_BLOCK_MESSAGE_IDS[error as keyof typeof AUTH_BLOCK_MESSAGE_IDS]
+                return messageId
+                  ? intl.formatMessage({
+                      id: messageId,
+                      defaultMessage:
+                        AUTH_BLOCK_MESSAGES[error as keyof typeof AUTH_BLOCK_MESSAGES],
+                    })
+                  : intl.formatMessage({
+                      id: 'portal.auth.authComplete.failedGeneric',
+                      defaultMessage:
+                        'Sign-in failed. Return to the original window and try again.',
+                    })
+              })()}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <FormattedMessage
+                id="portal.auth.authComplete.willClose"
+                defaultMessage="This window will close automatically."
+              />
+            </p>
           </>
         )}
       </div>
