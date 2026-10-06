@@ -40,6 +40,8 @@ const LOCALE_LABELS: Record<string, string> = {
   'zh-cn': '简体中文',
   'zh-tw': '繁體中文',
   da: 'Dansk',
+  nl: 'Nederlands',
+  pl: 'Polski',
 }
 
 const STATUS_LABELS: Record<string, string> = {

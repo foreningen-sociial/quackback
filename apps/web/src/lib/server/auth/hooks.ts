@@ -20,8 +20,9 @@
  */
 
 import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { getJwtToken } from 'better-auth/plugins'
 import type { UserId } from '@quackback/ids'
-import type { Role } from '@/lib/shared/roles'
+import { toSessionScope, type Role } from '@/lib/shared/roles'
 import {
   findProviderForDomainEmail,
   isRegisteredOidcProvider,
@@ -39,14 +40,26 @@ import {
 } from './signin-rate-limit'
 import { checkAnonMintRateLimit } from './widget-rate-limit'
 import {
-  computeDeviceFingerprint,
-  forgetDevice,
-  isDeviceUnseen,
-  markDeviceSeen,
-} from './signin-device-tracker'
+  isOidcCallbackPath,
+  LEGACY_OIDC_CALLBACK_PATH,
+  oidcCallbackProviderId,
+} from './oidc-callback-path'
+import { formatSignInDevice, forgetDevice, isDeviceUnseen } from './signin-device-tracker'
+import {
+  deviceCookieAttributes,
+  deviceCookieName,
+  mintDeviceId,
+  readDeviceCookie,
+  signDeviceCookie,
+} from './signin-device-cookie'
+import { getBaseUrl } from '@/lib/server/config'
 import { isSyntheticAnonEmail } from '@/lib/shared/anonymous-email'
+import { readSsoClaims, readSsoClaimsWithProvenance, type ClaimRead } from './read-sso-claims'
+import { applyClaimAttributesAfter } from './apply-claim-attributes'
 import { decodeSsoClaims } from './sso-claims-decode'
-import { takeResolvedClaims } from './resolved-claims-stash'
+import { peekResolvedClaims } from './resolved-claims-stash'
+import { pickAvatarUrl } from './resolve-identity'
+import { forgetRequestIdentity } from './request-session'
 import { logger } from '@/lib/server/logger'
 
 const log = logger.child({ component: 'auth-hooks' })
@@ -395,16 +408,93 @@ export async function handleSignInPreCheck(ctx: {
   }
 }
 
+/** Better Auth HTTP paths a widget-scoped session may call. Everything else
+ *  is denied so new BA endpoints stay closed by default. */
+const WIDGET_AUTH_ALLOWLIST = new Set([
+  '/get-session',
+  '/sign-in/anonymous',
+  '/one-time-token/generate',
+  '/one-time-token/verify',
+])
+
+type HeaderBag = { get(name: string): string | null }
+
+function sessionTokenFromAuthHeaders(headers: HeaderBag | undefined): string | null {
+  if (!headers) return null
+  const authHeader = headers.get('authorization') ?? headers.get('Authorization')
+  if (authHeader && authHeader.slice(0, 7).toLowerCase() === 'bearer ') {
+    const token = authHeader.slice(7).trim()
+    if (token) return token.includes('.') ? token.split('.')[0]! : token
+  }
+  const cookie = headers.get('cookie') ?? ''
+  for (const part of cookie.split(';')) {
+    const [name, ...rest] = part.trim().split('=')
+    if (name?.trim() !== 'better-auth.session_token') continue
+    const raw = rest.join('=')
+    if (!raw) return null
+    let value = raw
+    try {
+      value = decodeURIComponent(raw)
+    } catch {
+      /* keep raw */
+    }
+    return value.includes('.') ? value.split('.')[0]! : value
+  }
+  return null
+}
+
+/**
+ * Widget-scoped sessions may only hit the Better Auth allowlist. Portal and
+ * dashboard sessions still pass; missing sessions are left to the endpoint's
+ * own auth middleware.
+ *
+ * An allowlisted path passes whatever the session is, so it returns before the
+ * lookup: `/get-session` backs every authenticated request, and resolving the
+ * session here as well would double its cost.
+ */
+export async function handleWidgetAccountMutationGate(ctx: {
+  path?: string
+  headers?: HeaderBag
+  request?: { headers?: HeaderBag }
+  context?: {
+    internalAdapter?: {
+      findSession?: (token: string) => Promise<unknown>
+    }
+  }
+}): Promise<void> {
+  if (WIDGET_AUTH_ALLOWLIST.has(ctx.path ?? '')) return
+  const headers = ctx.headers ?? ctx.request?.headers
+  const token = sessionTokenFromAuthHeaders(headers)
+  if (!token) return
+  const found = await ctx.context?.internalAdapter?.findSession?.(token)
+  const session =
+    typeof found === 'object' &&
+    found !== null &&
+    Object.prototype.hasOwnProperty.call(found, 'session')
+      ? (found as { session?: { scope?: unknown } }).session
+      : undefined
+  if (!session) return
+  if (toSessionScope(session.scope) !== 'widget') return
+  throw new APIError('FORBIDDEN', {
+    message: 'Widget sessions cannot access this endpoint',
+  })
+}
+
 export const hooksBefore = createAuthMiddleware(async (ctx) => {
   // Disjoint path matchers: grace heal only touches /oauth2/token,
-  // sign-in pre-check only touches sign-in/OTP paths. Order is irrelevant.
+  // sign-in pre-check only touches sign-in/OTP paths. Widget-session
+  // allowlist covers every Better Auth HTTP path.
   await handleRefreshGraceHeal(ctx)
   await handleSignInPreCheck(ctx as Parameters<typeof handleSignInPreCheck>[0])
+  await handleWidgetAccountMutationGate(ctx)
 })
 
 /**
  * OIDC callback post-processing — runs for any registered OIDC provider's
- * callback (the genericOAuth path `/oauth2/callback/:providerId`).
+ * callback. Better Auth 1.7 delivers that on `/callback/:id` (`params.id`).
+ * Hooks also accept the legacy `/oauth2/callback/:providerId` template.
+ * The auth catch-all rewrites a pre-1.7 return onto `/callback/:id`
+ * before Better Auth sees it.
  *
  * Two responsibilities:
  *
@@ -453,10 +543,8 @@ export async function handleSsoCallbackAfter(
    *  Used to resolve the callback provider for the H8 promotion gate. */
   providers: readonly ProviderWithDomains[]
 ): Promise<void> {
-  if (ctx.path !== '/oauth2/callback/:providerId') return
-  const providerId = ctx.params?.providerId
-  if (typeof providerId !== 'string' || !isRegisteredOidcProvider(providerId, registeredOidcIds))
-    return
+  const providerId = oidcCallbackProviderId(ctx)
+  if (!providerId || !isRegisteredOidcProvider(providerId, registeredOidcIds)) return
   const userId = ctx.context?.newSession?.user?.id
   if (typeof userId !== 'string' || userId.length === 0) return
   const email = ctx.context?.newSession?.user?.email
@@ -551,8 +639,8 @@ export function shouldBootstrapPromote(
 /**
  * Auto-provision SSO users to a role on first OIDC sign-in.
  *
- * Fires on any registered OIDC provider's callback
- * (`/oauth2/callback/:providerId`). The IdP's assertion of email + identity
+ * Fires on any registered OIDC provider's callback (`/callback/:id`, and
+ * the legacy `/oauth2/callback/:providerId` alias). The IdP's assertion of email + identity
  * is the trust source; magic-link to a verified-domain email is hard-bound
  * in `hooksBefore` so it never reaches this path, and password/social
  * callbacks are likewise blocked.
@@ -601,12 +689,12 @@ export async function handleAutoProvisionAfter(
     >
   >,
   /** OIDC provider ids registered right now (from getRegisteredOidcProviderIds). */
-  registeredOidcIds: Set<string>
+  registeredOidcIds: Set<string>,
+  /** Shared per-callback claim reader. Omitted, falls back to `readSsoClaims`. */
+  readClaims?: () => Promise<ClaimRead>
 ): Promise<void> {
-  if (ctx.path !== '/oauth2/callback/:providerId') return
-  const providerId = ctx.params?.providerId
-  if (typeof providerId !== 'string' || !isRegisteredOidcProvider(providerId, registeredOidcIds))
-    return
+  const providerId = oidcCallbackProviderId(ctx)
+  if (!providerId || !isRegisteredOidcProvider(providerId, registeredOidcIds)) return
 
   const userId = ctx.context?.newSession?.user?.id
   const email = ctx.context?.newSession?.user?.email
@@ -631,8 +719,12 @@ export async function handleAutoProvisionAfter(
   const roleMapping = roleMappingFor(provider.claimMapping)
   let claimRole: Role | null = null
   if (roleMapping) {
-    const claims = await readSsoClaims(userIdTyped, providerId)
-    const { resolveSsoRole } = await import('./resolve-sso-role')
+    // Role resolution is indifferent to provenance: a role claim absent from
+    // the stored token yields the default role either way.
+    const claims = readClaims
+      ? (await readClaims()).claims
+      : await readSsoClaims(userIdTyped, providerId)
+    const { resolveSsoRole } = await import('@/lib/shared/resolve-sso-role')
     claimRole = resolveSsoRole(claims, roleMapping)
   }
 
@@ -701,7 +793,7 @@ export async function handleAutoProvisionAfter(
     await recordAuditEvent({
       event: 'user.role.changed',
       outcome: 'success',
-      actor: { email: email ?? null }, // SSO callback — no authenticated admin actor
+      actor: { userId: userIdTyped },
       target: { type: 'user', id: userIdTyped },
       before: { role: p.role },
       after: { role: targetRole },
@@ -712,45 +804,123 @@ export async function handleAutoProvisionAfter(
   log.info({ user_id: userId, role: targetRole }, 'auto-provisioned verified-domain user via sso')
 }
 
+type IdpRows = Awaited<
+  ReturnType<
+    typeof import('@/lib/server/domains/settings/identity-providers.service').listIdentityProviders
+  >
+>
+
 /**
- * Read the latest stored ID-token claims for a user's OIDC account.
- * Returns an empty object when no token is stored or the token is
- * malformed — caller should fall back to the legacy auto-provision
- * field in that case.
- *
- * `providerId` is the callback provider's registrationId (the account's
- * `provider_id`). It must match what just authenticated, else the row
- * lookup misses and attribute mapping silently returns {} → default role
- * for every non-`sso` provider.
+ * Resolve a provider's userinfo endpoint: the manual URL if set, else the
+ * `userinfo_endpoint` from its discovery document. SSRF-guarded, best-effort.
  */
-async function readSsoClaims(
-  userId: `user_${string}`,
-  providerId: string
-): Promise<Record<string, unknown>> {
-  const { db, account, and, eq, desc } = await import('@/lib/server/db')
+async function resolveUserInfoEndpoint(
+  provider: IdpRows[number] | undefined
+): Promise<string | null> {
+  if (!provider) return null
+  if (provider.userInfoUrl) return provider.userInfoUrl
+  if (!provider.discoveryUrl) return null
+  try {
+    const { safeFetch } = await import('@/lib/server/content/ssrf-guard')
+    const res = await safeFetch(provider.discoveryUrl, { timeoutMs: 5000 })
+    if (!res.ok) return null
+    const doc: unknown = await res.json()
+    const endpoint = (doc as { userinfo_endpoint?: unknown } | null)?.userinfo_endpoint
+    return typeof endpoint === 'string' ? endpoint : null
+  } catch {
+    return null
+  }
+}
+
+/** Fetch a userinfo document with the bearer token. Best-effort. */
+async function fetchUserInfoDoc(
+  url: string,
+  accessToken: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const { safeFetch } = await import('@/lib/server/content/ssrf-guard')
+    const res = await safeFetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeoutMs: 5000,
+    })
+    if (!res.ok) return null
+    const body: unknown = await res.json()
+    return body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fill `user.image` from the SSO `picture` claim — but only when the account
+ * has no avatar yet.
+ *
+ * Better-Auth's genericOAuth writes `image` only when it CREATES the user, and
+ * we deliberately leave `overrideUserInfo` off ("set once, never clobber a
+ * picture the user chose in Quackback"). Neither covers the common case: an
+ * account that already existed before the workspace's IdP started returning a
+ * `picture`, or before this feature shipped. This closes that gap without ever
+ * overwriting a non-empty avatar.
+ *
+ * `picture` is sourced, in order:
+ *   1. the request's resolved claims (peeked, not consumed, so role
+ *      provisioning still takes its copy) — the free path;
+ *   2. the stored ID token;
+ *   3. a live userinfo call with the just-issued access token — the
+ *      deterministic path for an IdP that exposes `picture` only at userinfo,
+ *      where (1) can miss if role provisioning drained the stash first.
+ *
+ * Runs BEFORE `handleAutoProvisionAfter` so the peek in (1) sees the stash.
+ */
+export async function handleAvatarBackfillAfter(
+  ctx: {
+    path?: string
+    params?: Record<string, unknown>
+    context?: { newSession?: { user?: { id?: string } } | null }
+  },
+  registeredOidcIds: Set<string>,
+  providers: IdpRows
+): Promise<void> {
+  const providerId = oidcCallbackProviderId(ctx)
+  if (!providerId || !isRegisteredOidcProvider(providerId, registeredOidcIds)) return
+  const userId = ctx.context?.newSession?.user?.id
+  if (typeof userId !== 'string' || userId.length === 0) return
+  type UserId = `user_${string}`
+  const userIdTyped = userId as UserId
+
+  const { db, user: userTable, account, and, eq, desc } = await import('@/lib/server/db')
+
+  const owner = await db.query.user.findFirst({
+    where: eq(userTable.id, userIdTyped),
+    columns: { image: true },
+  })
+  // Only fill an empty avatar — never replace one the user set.
+  if (!owner || (typeof owner.image === 'string' && owner.image.trim() !== '')) return
+
   const row = await db.query.account.findFirst({
-    where: and(eq(account.userId, userId), eq(account.providerId, providerId)),
-    columns: { idToken: true, accountId: true },
-    // Deterministic ordering. There is no uniqueness constraint on
-    // (user_id, provider_id), so a duplicate account row — which a change in
-    // which claim supplies the account identifier can create — would otherwise
-    // leave this reading whichever row the database happened to return, quite
-    // possibly a stale one, on every sign-in.
+    where: and(eq(account.userId, userIdTyped), eq(account.providerId, providerId)),
+    columns: { idToken: true, accountId: true, accessToken: true },
     orderBy: desc(account.createdAt),
   })
 
-  // Prefer what the resolver actually validated this request. The stored ID
-  // token is a fallback: a provider resolving identity from userinfo or an
-  // access token has none, and would otherwise always land on the default role
-  // however its claims are mapped.
-  if (row?.accountId) {
-    const fresh = takeResolvedClaims(providerId, row.accountId)
-    if (fresh) return fresh
+  const stashed = row?.accountId ? peekResolvedClaims(providerId, row.accountId) : null
+  let image = pickAvatarUrl(stashed ?? decodeSsoClaims(row?.idToken))
+
+  // Last resort: ask userinfo directly. `picture` frequently lives only there,
+  // and the stash can be gone by now.
+  if (!image && row?.accessToken) {
+    const endpoint = await resolveUserInfoEndpoint(
+      providers.find((p) => p.registrationId === providerId)
+    )
+    if (endpoint) {
+      image = pickAvatarUrl((await fetchUserInfoDoc(endpoint, row.accessToken)) ?? {})
+    }
   }
 
-  // Refuses an expired token; see sso-claims-decode.ts for why freshness is
-  // the property that matters when the signature is not verified.
-  return decodeSsoClaims(row?.idToken)
+  if (!image) return
+
+  await db.update(userTable).set({ image }).where(eq(userTable.id, userIdTyped))
+  log.info({ user_id: userId, provider_id: providerId }, 'backfilled sso avatar')
 }
 
 /**
@@ -1002,18 +1172,16 @@ export async function handleTwoFactorLifecycleAudit(ctx: {
  * are logged. Passwords, tokens, and credential material are never
  * recorded.
  *
- * Covers two paths:
+ * Covers:
  *  - `/sign-in/email` (password) — newSession absent on wrong password.
  *  - `/magic-link/verify` / `/sign-in/email-otp` — newSession absent
  *    on invalid or expired token.
+ *  - OIDC / social callbacks — labeled `sso` only for a registered
+ *    customer IdP (or the legacy OIDC-only template). GitHub / Google
+ *    / Microsoft on the shared `/callback/:id` path are `oauth`.
  */
 const CREDENTIAL_FAILURE_PATHS = new Set<string>(['/sign-in/email'])
 const MAGIC_LINK_FAILURE_PATHS = new Set<string>(['/magic-link/verify', '/sign-in/email-otp'])
-/** The genericOAuth callback, as a Better-Auth path TEMPLATE — the concrete
- *  provider id lives in `ctx.params.providerId`, matching `inferProvider`.
- *  A failure here redirects with `?error=<code>` rather than returning a body,
- *  so the reason is read off the Location header. */
-const OIDC_CALLBACK_PATH = '/oauth2/callback/:providerId'
 
 /**
  * Pull the IdP-reported failure code out of the callback's redirect and
@@ -1032,25 +1200,29 @@ function oidcFailureReason(returned: unknown): string | null {
   }
 }
 
-export async function handleSignInFailureAudit(ctx: {
-  path?: string
-  params?: Record<string, unknown>
-  body?: Record<string, unknown>
-  context?: {
-    newSession?: {
-      user?: { id?: string; email?: string }
-      session?: { token?: string }
-    } | null
-    /** The Response the route produced, when the hook chain exposes it. */
-    returned?: unknown
-  }
-}): Promise<void> {
+export async function handleSignInFailureAudit(
+  ctx: {
+    path?: string
+    params?: Record<string, unknown>
+    body?: Record<string, unknown>
+    context?: {
+      newSession?: {
+        user?: { id?: string; email?: string }
+        session?: { token?: string }
+      } | null
+      /** The Response the route produced, when the hook chain exposes it. */
+      returned?: unknown
+    }
+  },
+  /** OIDC provider ids registered right now (from getRegisteredOidcProviderIds). */
+  registeredOidcIds: Set<string> = new Set()
+): Promise<void> {
   // Only fire on sign-in paths where a failure produces no newSession.
   const path = ctx.path ?? ''
   const isCredentialPath = CREDENTIAL_FAILURE_PATHS.has(path)
   const isMagicLinkPath = MAGIC_LINK_FAILURE_PATHS.has(path)
-  const isOidcCallback = path === OIDC_CALLBACK_PATH
-  if (!isCredentialPath && !isMagicLinkPath && !isOidcCallback) return
+  const isCallback = isOidcCallbackPath(path)
+  if (!isCredentialPath && !isMagicLinkPath && !isCallback) return
 
   // If a session was actually created, the success audit handles it.
   const sessionCreated =
@@ -1059,16 +1231,26 @@ export async function handleSignInFailureAudit(ctx: {
 
   // Each path shape contributes only its actor + reason; the emit tail below is
   // shared so a change to it (a retry, a new field, the log level) lands once.
-  let actor: { email: string | null; type: 'user'; authMethod: 'sso' | 'magic_link' | 'password' }
+  let actor: {
+    email: string | null
+    type: 'user'
+    authMethod: 'sso' | 'oauth' | 'magic_link' | 'password'
+  }
   let metadata: Record<string, unknown>
 
-  if (isOidcCallback) {
+  if (isCallback) {
     // No email is recorded. The callback body carries no typed credential, and
     // any address in play came from the IdP response rather than a user attempt.
-    actor = { email: null, type: 'user', authMethod: 'sso' }
+    const providerId = oidcCallbackProviderId(ctx)
+    const isSso =
+      path === LEGACY_OIDC_CALLBACK_PATH ||
+      (providerId !== null && isRegisteredOidcProvider(providerId, registeredOidcIds))
+    actor = { email: null, type: 'user', authMethod: isSso ? 'sso' : 'oauth' }
     metadata = {
-      reason: oidcFailureReason(ctx.context?.returned) ?? 'OIDC_SIGNIN_FAILED',
-      providerId: typeof ctx.params?.providerId === 'string' ? ctx.params.providerId : null,
+      reason:
+        oidcFailureReason(ctx.context?.returned) ??
+        (isSso ? 'OIDC_SIGNIN_FAILED' : 'OAUTH_SIGNIN_FAILED'),
+      providerId,
     }
   } else {
     // Never log passwords, tokens, or other credential material — only the
@@ -1172,22 +1354,31 @@ export async function handleSignInSuccessAudit(ctx: {
 }
 
 /**
- * First-sight new-device notification. Atomic SADD claims the
- * fingerprint; on success we fire the email + audit row in parallel
- * and refresh the SET's 90-day TTL. On failure we roll back the
- * claim so the next sign-in re-fires the alert rather than losing
- * it to a transient SMTP outage. All errors swallowed — Redis/SMTP
- * outages must not break sign-in.
+ * First-sight new-device notification. Identity is the signed
+ * `qb.device.{userId}` cookie. Atomic claim of that id; on success we
+ * fire the email + audit row in parallel. On failure we roll back the
+ * claim so the next sign-in re-fires the alert rather than losing it
+ * to a transient SMTP outage. The cookie is written on every real
+ * sign-in (known or new) so a later request can reuse the id. All
+ * errors swallowed — store/SMTP outages must not break sign-in.
+ *
+ * Better Auth sets `newSession` whenever it writes a session cookie,
+ * including `/get-session` sliding the 24h `updateAge`. That is not a
+ * sign-in. Gate on `inferProvider` the same way `handleSignInSuccessAudit`
+ * does, and skip anonymous widget mints.
  */
 export async function handleNewDeviceNotification(
   ctx: {
     path?: string
+    params?: Record<string, unknown>
+    body?: Record<string, unknown>
     context?: {
       newSession?: {
         user?: { id?: string; email?: string }
         session?: { token?: string }
       } | null
     }
+    setCookie?: (name: string, value: string, opts?: Record<string, unknown>) => string
   },
   workspace: Awaited<
     ReturnType<typeof import('@/lib/server/domains/settings/settings.service').getWorkspaceSettings>
@@ -1198,30 +1389,55 @@ export async function handleNewDeviceNotification(
   const token = ctx.context?.newSession?.session?.token
   if (typeof userId !== 'string' || typeof email !== 'string' || typeof token !== 'string') return
 
+  const provider = inferProvider(ctx)
+  if (!provider || provider === 'anonymous') return
+
   const headers = getRequestHeaders()
   const userAgent = headers.get('user-agent') ?? ''
   const ip = getClientIp(headers)
-  const fingerprint = computeDeviceFingerprint(userAgent, ip)
 
-  const unseen = await isDeviceUnseen(userId, fingerprint).catch(() => false)
+  const deviceId = ensureSignInDeviceId(ctx, userId, headers.get('cookie') ?? '')
+  if (!deviceId) return
+
+  const unseen = await isDeviceUnseen(userId, deviceId)
   if (!unseen) return
 
-  // Email + audit are independent — fire in parallel. TTL refresh
-  // runs only on full success so a failure can roll back via
-  // `forgetDevice` and re-fire on the next sign-in.
+  // Email + audit are independent — fire in parallel. A failure
+  // rolls back via `forgetDevice` so the next sign-in re-fires.
   try {
     const { sendNewSignInEmail } = await import('@quackback/email')
     const { recordAuditEvent } = await import('@/lib/server/audit/log')
     const { resolveAccountRecipient } = await import('@/lib/server/email/recipient')
     const occurredAt = new Date().toISOString()
+    const device = formatSignInDevice(userAgent)
+    const location = captureCountryFromHeaders(headers)
+    const base = getBaseUrl().replace(/\/$/, '')
+    const settingsUrl = base ? `${base}/settings/profile` : undefined
     // Account class, and deliberately no contact-address fallback: this alert
     // discloses IP, user agent and sign-in timing, and a contact address can be
     // one an agent typed into the inbox. An account with no deliverable address
-    // simply does not get the alert. The audit row and markDeviceSeen still run,
-    // or every subsequent sign-in would retry a send that can never succeed.
+    // simply does not get the alert. The audit row still runs, or every
+    // subsequent sign-in would retry a send that can never succeed.
     const to = await resolveAccountRecipient(userId as UserId)
     if (!to) {
       log.warn({ user_id: userId }, 'new-device alert skipped: no deliverable account address')
+    }
+    // Same predicate the profile page uses to hide PasswordForm. Fail open
+    // so a registry miss still sends the alert (password copy) rather than
+    // skipping it or blocking sign-in.
+    let ssoEnforced = false
+    if (to) {
+      try {
+        const { isHardBound } = await import('./auth-restrictions')
+        const { listIdentityProviders } =
+          await import('@/lib/server/domains/settings/identity-providers.service')
+        const { getRegisteredOidcProviderIds } = await import('./registered-providers')
+        const providers = await listIdentityProviders()
+        const registeredOidcIds = await getRegisteredOidcProviderIds(providers)
+        ssoEnforced = isHardBound('credential', email, providers, registeredOidcIds)
+      } catch (error) {
+        log.warn({ err: error }, 'sso-enforced lookup failed; sending password recovery copy')
+      }
     }
     await Promise.all([
       to
@@ -1230,7 +1446,10 @@ export async function handleNewDeviceNotification(
             workspaceName: workspace?.name,
             occurredAt,
             ipAddress: ip,
-            userAgent,
+            userAgent: device,
+            location,
+            settingsUrl: ssoEnforced ? undefined : settingsUrl,
+            ssoEnforced,
             logoUrl: workspace?.brandingData?.logoUrl ?? undefined,
           })
         : Promise.resolve(),
@@ -1239,13 +1458,46 @@ export async function handleNewDeviceNotification(
         outcome: 'success',
         actor: { userId: userId as `user_${string}`, email },
         headers,
-        metadata: { ip, userAgent },
+        metadata: { ip, userAgent, device, location },
       }),
     ])
-    await markDeviceSeen(userId)
   } catch (error) {
     log.error({ err: error }, 'new-device notification failed')
-    await forgetDevice(userId, fingerprint)
+    await forgetDevice(userId, deviceId)
+  }
+}
+
+/** Mint or reuse the cookie id and write it. Returns null when we
+ *  cannot identify this browser (missing workspace secret, userId that
+ *  is not a cookie-name token, or a freshly minted id that never
+ *  reached the browser). */
+function ensureSignInDeviceId(
+  ctx: {
+    setCookie?: (name: string, value: string, opts?: Record<string, unknown>) => string
+  },
+  userId: string,
+  cookieHeader: string
+): string | null {
+  try {
+    const existing = readDeviceCookie(cookieHeader, userId)
+    const deviceId = existing ?? mintDeviceId()
+    const value = signDeviceCookie(userId, deviceId)
+    if (typeof ctx.setCookie !== 'function') {
+      if (!existing) {
+        log.warn('device cookie not set: Better Auth setCookie missing on after-hook ctx')
+        return null
+      }
+      return deviceId
+    }
+    ctx.setCookie(
+      deviceCookieName(userId),
+      value,
+      deviceCookieAttributes(getBaseUrl().startsWith('https://'))
+    )
+    return deviceId
+  } catch (error) {
+    log.error({ err: error }, 'device cookie failed; treating device as known')
+    return null
   }
 }
 
@@ -1297,24 +1549,73 @@ export async function handleCountryCapture(ctx: {
  *     per-domain SSO enforcement or a disabled per-method toggle. SSO is
  *     allowed for every role, so verified-domain users pass this step; it
  *     gates the non-SSO providers.
- *  4. `handleSignInSuccessAudit` — emits `auth.signin.success` if a
+ *  4. `applyClaimAttributesAfter` — copy mapped IdP claims into person
+ *     attributes. After cleanup so a revoked session writes nothing;
+ *     wrapped in try/catch so a DB error never blocks sign-in.
+ *  5. `handleSignInSuccessAudit` — emits `auth.signin.success` if a
  *     session still exists at this point (i.e. wasn't revoked by
  *     prior steps). Runs after the gates so it only records sign-ins
  *     that actually stuck.
- *  5. `handleNewDeviceNotification` — sends a "new device" email +
- *     records an audit row when the user's UA + /24-IP combination
- *     hasn't been seen for them within the last 90 days.
+ *  6. `handleNewDeviceNotification` — sends a "new device" email +
+ *     records an audit row when an additional signed device cookie
+ *     for this user hasn't been seen within the last 90 days. The
+ *     first recorded device is seeded silently. Alerts cannot be
+ *     disabled. Bowser labels the email; it is not the claim key.
  */
+/**
+ * The jwt plugin's `set-auth-jwt` header on `/get-session`, for HTTP callers
+ * only.
+ *
+ * A client reads the session's signed JWT from this header. The plugin's own
+ * hook (disabled in `auth/index.ts`) also signed one for every in-process
+ * `auth.api.getSession`, where the header is discarded, at the cost of a JWKS
+ * read and a signature on every session resolution. An in-process call carries
+ * no `request`; a routed one always does. Mirrors the plugin's hook otherwise.
+ */
+export async function handleSessionJwtHeader(ctx: {
+  path?: string
+  request?: unknown
+  context?: {
+    session?: { session?: unknown } | null
+    newSession?: { session?: unknown } | null
+    responseHeaders?: Headers
+  }
+  setHeader?: (name: string, value: string) => void
+}): Promise<void> {
+  if (ctx.path !== '/get-session' || !ctx.request || !ctx.setHeader) return
+  const session = ctx.context?.session || ctx.context?.newSession
+  if (!session?.session) return
+  const jwt = await getJwtToken(ctx as Parameters<typeof getJwtToken>[0])
+  const exposed = ctx.context?.responseHeaders?.get('access-control-expose-headers') || ''
+  const headers = new Set(
+    exposed
+      .split(',')
+      .map((header) => header.trim())
+      .filter(Boolean)
+  )
+  headers.add('set-auth-jwt')
+  ctx.setHeader('set-auth-jwt', jwt)
+  ctx.setHeader('Access-Control-Expose-Headers', Array.from(headers).join(', '))
+}
+
 export const hooksAfter = createAuthMiddleware(async (ctx) => {
   if (process.env.AUTH_HOOKS_DEBUG === '1') {
     const provider = inferProvider(ctx as Parameters<typeof inferProvider>[0])
     log.debug({ path: ctx.path, provider: provider ?? null }, 'after-hook')
   }
 
+  // Any endpoint but a session read may have changed who the request is
+  // (sign-in, sign-out, a revoked session, a changed email or password). An
+  // in-process call is followed by the rest of its request, which must read
+  // the identity afresh rather than the memoized one.
+  if (ctx.path !== '/get-session') forgetRequestIdentity()
+  await handleSessionJwtHeader(ctx as Parameters<typeof handleSessionJwtHeader>[0])
+
   // The provider registry is only consulted by the OAuth-callback after-hooks
-  // (bootstrap promotion, auto-provision, policy cleanup). Skip the DB read on
-  // password / magic-link success paths — those callbacks early-return before
-  // touching `providers` / `registeredOidcIds`, so the empty defaults are safe.
+  // (bootstrap promotion, auto-provision, policy cleanup, claim attributes).
+  // Skip the DB read on password / magic-link success paths — those callbacks
+  // early-return before touching `providers` / `registeredOidcIds`, so the
+  // empty defaults are safe.
   let providers: Awaited<
     ReturnType<
       typeof import('@/lib/server/domains/settings/identity-providers.service').listIdentityProviders
@@ -1340,10 +1641,37 @@ export const hooksAfter = createAuthMiddleware(async (ctx) => {
   const { getWorkspaceSettings } = await import('@/lib/server/domains/settings/settings.service')
   const workspace = await getWorkspaceSettings()
 
+  // One claim read per callback. The stash is take-once, so role
+  // provisioning and attribute writes must share the result rather than
+  // each calling `takeResolvedClaims`.
+  let claimsPromise: Promise<ClaimRead> | undefined
+  const callbackUserId = ctx.context?.newSession?.user?.id
+  const callbackProviderId = oidcCallbackProviderId(ctx)
+  const readClaims =
+    callbackProviderId !== null && typeof callbackUserId === 'string'
+      ? () => {
+          if (!claimsPromise) {
+            claimsPromise = readSsoClaimsWithProvenance(
+              callbackUserId as `user_${string}`,
+              callbackProviderId
+            )
+          }
+          return claimsPromise
+        }
+      : undefined
+
+  // Before auto-provision: this one only PEEKS the resolved-claims stash, and
+  // role provisioning (below) TAKES it — so the avatar has to look first.
+  await handleAvatarBackfillAfter(
+    ctx as Parameters<typeof handleAvatarBackfillAfter>[0],
+    registeredOidcIds,
+    providers
+  )
   await handleAutoProvisionAfter(
     ctx as Parameters<typeof handleAutoProvisionAfter>[0],
     providers,
-    registeredOidcIds
+    registeredOidcIds,
+    readClaims
   )
   await handleCallbackPolicyCleanup(
     ctx as Parameters<typeof handleCallbackPolicyCleanup>[0],
@@ -1351,17 +1679,36 @@ export const hooksAfter = createAuthMiddleware(async (ctx) => {
     providers,
     registeredOidcIds
   )
+  try {
+    await applyClaimAttributesAfter(
+      ctx as Parameters<typeof applyClaimAttributesAfter>[0],
+      providers,
+      registeredOidcIds,
+      readClaims
+    )
+  } catch {
+    log.error(
+      {
+        code: 'claim_attribute_write_failed',
+        user_id: callbackUserId,
+        provider_id: callbackProviderId,
+      },
+      'claim attribute write failed'
+    )
+  }
   // SOC2 trail for user-initiated 2FA lifecycle (`two_factor.enabled`
   // and `two_factor.disabled`). Independent of sign-in success audit;
   // both can fire on the same request only for the verify-totp
   // enrollment path (which itself does not constitute a sign-in).
   await handleTwoFactorLifecycleAudit(ctx as Parameters<typeof handleTwoFactorLifecycleAudit>[0])
-  await handleSignInFailureAudit(ctx as Parameters<typeof handleSignInFailureAudit>[0])
+  await handleSignInFailureAudit(
+    ctx as Parameters<typeof handleSignInFailureAudit>[0],
+    registeredOidcIds
+  )
   await handleSignInSuccessAudit(ctx as Parameters<typeof handleSignInSuccessAudit>[0])
   // Geo-IP country from CDN headers; written best-effort, never blocks.
   await handleCountryCapture(ctx as Parameters<typeof handleCountryCapture>[0])
-  // Fires only when a new device fingerprint (UA + /24) for this user
-  // is observed; default-on but workspace can opt out.
+  // Fires only on a real sign-in path when an additional device is unseen.
   await handleNewDeviceNotification(
     ctx as Parameters<typeof handleNewDeviceNotification>[0],
     workspace

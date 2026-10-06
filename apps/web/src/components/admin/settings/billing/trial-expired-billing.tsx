@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { BillingProjectionOverview } from '@/lib/server/domains/billing/projection-overview'
 import type { BillingCatalogue } from '@/lib/server/control-plane/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/shared/utils'
 import { formatUsd } from '@/lib/shared/format-usd'
+import { annualSavingsLabel } from '@/lib/shared/billing/checkout-path'
 import {
   billingPlanAction,
   catalogueTrialedPlanIds,
@@ -12,11 +13,13 @@ import {
 } from '@/lib/shared/billing/plan-action'
 import { FreeDowngradeDialog } from './free-downgrade-dialog'
 import { SubscribeDialog } from './subscribe-dialog'
+import { INLINE_LINK } from '@/components/admin/settings/inline-link'
 
 export function TrialExpiredBilling(props: {
   overview: BillingProjectionOverview
   catalogue: BillingCatalogue | null
   catalogueError: string | null
+  pending?: { planId: string; planName: string } | null
 }) {
   const [period, setPeriod] = useState<'monthly' | 'annual'>('annual')
   const [selectedId, setSelectedId] = useState<PaidPlanId | 'free'>(
@@ -24,12 +27,15 @@ export function TrialExpiredBilling(props: {
   )
   const [subscribeOpen, setSubscribeOpen] = useState(false)
   const [freeOpen, setFreeOpen] = useState(false)
+
+  useEffect(() => {
+    if (props.pending?.planId === 'free') setFreeOpen(true)
+  }, [props.pending?.planId])
   const { overview, catalogue } = props
   const trialedPlanIds = catalogueTrialedPlanIds(catalogue)
   const plans = catalogue?.plans ?? []
   const selected = plans.find((plan) => plan.id === selectedId)
   const paidSelected = selected && selected.id !== 'free' ? selected : null
-  const checkoutQuantity = Math.max(overview.seats?.used ?? 1, 1)
   const trialName = overview.trialPlanName ?? 'your plan'
 
   return (
@@ -50,7 +56,7 @@ export function TrialExpiredBilling(props: {
             </div>
             <PeriodToggle
               value={period}
-              discountMonths={catalogue?.annualDiscountMonths ?? 2}
+              savingsLabel={annualSavingsLabel(paidSelected)}
               onChange={setPeriod}
             />
           </div>
@@ -61,7 +67,7 @@ export function TrialExpiredBilling(props: {
             </p>
           ) : null}
 
-          <div className="overflow-hidden rounded-xl border border-border/50 bg-card">
+          <div data-settings-card="" className="overflow-hidden rounded-xl border bg-card">
             {plans.map((plan) => {
               const action = billingPlanAction(plan.id, overview, trialedPlanIds)
               const isCurrent = overview.trialPlanId
@@ -86,7 +92,7 @@ export function TrialExpiredBilling(props: {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm font-semibold">{plan.name}</span>
                       {isCurrent ? (
-                        <Badge size="sm" shape="pill" variant="secondary">
+                        <Badge size="sm" variant="secondary">
                           Current
                         </Badge>
                       ) : null}
@@ -94,7 +100,7 @@ export function TrialExpiredBilling(props: {
                     <p className="mt-1 text-[13px] text-muted-foreground">{plan.bestFor}</p>
                     {plan.id === 'free' ? (
                       <span
-                        className="mt-2 inline-flex text-[13px] font-medium text-primary"
+                        className={`${INLINE_LINK} mt-2 inline-flex text-[13px]`}
                         onClick={(e) => {
                           e.stopPropagation()
                           setFreeOpen(true)
@@ -109,11 +115,7 @@ export function TrialExpiredBilling(props: {
                       {formatUsd(monthly, 0)}
                     </span>
                     <span className="block text-[12px] text-muted-foreground">
-                      {plan.id === 'free'
-                        ? 'forever'
-                        : plan.billedPer === 'seat'
-                          ? '/seat/mo'
-                          : '/mo'}
+                      {plan.id === 'free' ? 'forever' : '/mo'}
                     </span>
                   </p>
                   {action.kind === 'subscribe' || action.kind === 'current' ? (
@@ -129,10 +131,10 @@ export function TrialExpiredBilling(props: {
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             2 Payment
           </p>
-          <div className="rounded-xl border border-border/50 bg-card p-5">
+          <div data-settings-card="" className="rounded-xl border bg-card p-5">
             <h3 className="text-sm font-semibold">Order summary</h3>
             {paidSelected ? (
-              <OrderSummary plan={paidSelected} period={period} seats={checkoutQuantity} />
+              <OrderSummary plan={paidSelected} period={period} />
             ) : (
               <p className="mt-3 text-[13px] text-muted-foreground">
                 Free has no charge. Resolve anything over the Free caps, then switch.
@@ -156,8 +158,6 @@ export function TrialExpiredBilling(props: {
           open
           plan={paidSelected}
           endsTrial
-          minSeats={checkoutQuantity}
-          discountMonths={catalogue?.annualDiscountMonths ?? 2}
           period={period}
           onOpenChange={setSubscribeOpen}
         />
@@ -171,36 +171,26 @@ export function TrialExpiredBilling(props: {
 function OrderSummary(props: {
   plan: BillingCatalogue['plans'][number]
   period: 'monthly' | 'annual'
-  seats: number
 }) {
   const yearly = props.period === 'annual'
-  const billedPerSeat = props.plan.billedPer === 'seat'
   const unit = yearly ? props.plan.priceYearlyCents : props.plan.priceMonthlyCents
-  const quantity = billedPerSeat ? props.seats : 1
-  const total = unit * quantity
-  const monthly = yearly ? Math.round(total / 12) : total
+  const monthly = yearly ? Math.round(unit / 12) : unit
   return (
     <dl className="mt-4 space-y-2 text-[13px]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <dt className="font-medium">{props.plan.name} plan</dt>
-          <dd className="text-muted-foreground">
-            {billedPerSeat
-              ? `${quantity} seat${quantity === 1 ? '' : 's'} × ${formatUsd(unit, 0)}/${yearly ? 'year' : 'mo'}`
-              : yearly
-                ? 'Billed yearly'
-                : 'Billed monthly'}
-          </dd>
+          <dd className="text-muted-foreground">{yearly ? 'Billed yearly' : 'Billed monthly'}</dd>
         </div>
         <dd className="font-medium tabular-nums">
-          {formatUsd(total, 0)}
+          {formatUsd(unit, 0)}
           {yearly ? '/year' : '/mo'}
         </dd>
       </div>
       <div className="flex items-center justify-between border-t border-border/50 pt-2">
         <dt className="font-medium">Total</dt>
         <dd className="font-medium tabular-nums">
-          {formatUsd(total, 0)}
+          {formatUsd(unit, 0)}
           {yearly ? '/year' : '/mo'}
         </dd>
       </div>
@@ -216,7 +206,7 @@ function OrderSummary(props: {
 
 function PeriodToggle(props: {
   value: 'monthly' | 'annual'
-  discountMonths: number
+  savingsLabel: string | null
   onChange: (next: 'monthly' | 'annual') => void
 }) {
   return (
@@ -242,9 +232,11 @@ function PeriodToggle(props: {
           {option === 'annual' ? (
             <>
               Yearly
-              <span className="ms-1.5 text-[11px] font-semibold text-primary">
-                {props.discountMonths} mo free
-              </span>
+              {props.savingsLabel ? (
+                <span className="ms-1.5 text-[11px] font-semibold text-primary">
+                  {props.savingsLabel}
+                </span>
+              ) : null}
             </>
           ) : (
             'Monthly'

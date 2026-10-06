@@ -1,7 +1,16 @@
 // @vitest-environment happy-dom
 import type { ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render as baseRender, screen, fireEvent, waitFor } from '@testing-library/react'
+import { IntlProvider } from 'react-intl'
+
+function render(ui: React.ReactElement) {
+  return baseRender(
+    <IntlProvider locale="en-GB" messages={{}}>
+      {ui}
+    </IntlProvider>
+  )
+}
 
 const mockEnable = vi.fn()
 const mockVerifyTotp = vi.fn()
@@ -57,7 +66,7 @@ beforeEach(() => {
 describe('TwoFactorEnrollSteps', () => {
   it('enables on mount and renders the QR step', async () => {
     render(<TwoFactorEnrollSteps password="pw" onComplete={() => {}} onCancel={() => {}} />)
-    await waitFor(() => expect(mockEnable).toHaveBeenCalledWith({ password: 'pw' }))
+    await waitFor(() => expect(mockEnable).toHaveBeenCalledWith({ password: 'pw', method: 'totp' }))
     expect(await screen.findByAltText(/QR code/i)).toBeInTheDocument()
   })
 

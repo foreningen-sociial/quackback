@@ -28,6 +28,7 @@ import {
 import {
   findHumanAdmin,
   isOpenToBootstrapClaim,
+  isSetupOpenToClaim,
 } from '@/lib/server/domains/principals/bootstrap-admin'
 import { isAdmin } from '@/lib/shared/roles'
 import { PERMISSIONS } from '@/lib/shared/permissions'
@@ -43,6 +44,7 @@ import {
 } from '@/lib/server/domains/principals/principal.service'
 import { listPortalUsers, removePortalUser } from '@/lib/server/domains/users/user.service'
 import { getPortalUserDetail } from '@/lib/server/domains/users/user.detail'
+import type { PortalUserDetail } from '@/lib/server/domains/users/user.types'
 import {
   listSegments,
   createSegment,
@@ -60,13 +62,6 @@ import {
   removeSegmentEvaluationSchedule,
 } from '@/lib/server/events/segment-scheduler'
 import type { CreateSegmentInput, UpdateSegmentInput } from '@/lib/server/domains/segments'
-import {
-  listUserAttributes,
-  createUserAttribute,
-  updateUserAttribute,
-  deleteUserAttribute,
-} from '@/lib/server/domains/user-attributes/user-attribute.service'
-import type { UserAttributeId } from '@quackback/ids'
 import { sendInvitationEmail } from '@quackback/email'
 import { getBaseUrl } from '@/lib/server/config'
 import {
@@ -350,11 +345,14 @@ export const fetchOnboardingStatus = createServerFn({ method: 'GET' }).handler(a
   const auth = await requireAuth({ permission: PERMISSIONS.MEMBER_VIEW })
 
   const { getWidgetConfig } = await import('@/lib/server/domains/settings/settings.widget')
-  const { boards, helpCenterArticles, isNull } = await import('@/lib/server/db')
+  const { boards, changelogEntries, helpCenterArticles, isNotNull, isNull, statusComponents } =
+    await import('@/lib/server/db')
   const { getSetupState } = await import('@/lib/shared/db-types')
   const { permissionsForLegacyRole } = await import('@/lib/server/policy/permissions')
   const { resolveFeatureFlags } = await import('@/lib/server/domains/settings/settings.types')
   const { getTierLimits } = await import('@/lib/server/domains/settings/tier-limits.service')
+  const { hasEntitlement } = await import('@/lib/server/domains/settings/cloud/entitlements')
+  const { isAssistantConfigured } = await import('@/lib/server/domains/assistant')
 
   const [
     orgBoards,
@@ -363,7 +361,10 @@ export const fetchOnboardingStatus = createServerFn({ method: 'GET' }).handler(a
     widgetConfig,
     connectedIntegration,
     helpArticle,
+    publishedChangelog,
+    statusComponent,
     tierLimits,
+    assistantEntitled,
   ] = await Promise.all([
     db.query.boards.findMany({
       columns: { id: true, slug: true, access: true },
@@ -384,7 +385,16 @@ export const fetchOnboardingStatus = createServerFn({ method: 'GET' }).handler(a
       columns: { id: true },
       where: isNull(helpCenterArticles.deletedAt),
     }),
+    db.query.changelogEntries.findFirst({
+      columns: { id: true },
+      where: and(isNull(changelogEntries.deletedAt), isNotNull(changelogEntries.publishedAt)),
+    }),
+    db.query.statusComponents.findFirst({
+      columns: { id: true },
+      where: isNull(statusComponents.deletedAt),
+    }),
     getTierLimits(),
+    hasEntitlement('aiAssistant'),
   ])
 
   const setupState = getSetupState(orgSettings?.setupState ?? null)
@@ -396,6 +406,10 @@ export const fetchOnboardingStatus = createServerFn({ method: 'GET' }).handler(a
   // Messenger is "live" when the widget is on and the Messages tab is shown.
   const hasMessengerEnabled = hasWidgetEnabled && (widgetConfig.tabs?.messenger ?? true)
   const hasIntegration = Boolean(connectedIntegration)
+  // The Agent answers unless it is switched off or paused; both default to on.
+  const assistantDeployment = widgetConfig.messenger?.assistant
+  const hasAgentAnswering =
+    (assistantDeployment?.enabled ?? true) && (assistantDeployment?.respond ?? true)
   const hasInternalBoard = orgBoards.some((board) => board.access.view === 'team')
   const publicBoard = orgBoards.find((board) => board.access.view === 'anonymous')
   const hasPublicBoard = Boolean(publicBoard)
@@ -408,6 +422,8 @@ export const fetchOnboardingStatus = createServerFn({ method: 'GET' }).handler(a
       has_widget: hasWidgetEnabled,
       has_messenger: hasMessengerEnabled,
       has_help_article: Boolean(helpArticle),
+      has_published_changelog: Boolean(publishedChangelog),
+      has_status_component: Boolean(statusComponent),
       use_case: setupState?.useCase,
     },
     'fetch onboarding status'
@@ -434,7 +450,10 @@ export const fetchOnboardingStatus = createServerFn({ method: 'GET' }).handler(a
       widgetSdkNeedsUpdate(orgSettings?.widgetInstalledSdkVersion, CURRENT_WIDGET_SDK_VERSION),
     hasWidgetEnabled,
     hasMessengerEnabled,
+    hasAgentAnswering,
     hasHelpArticle: Boolean(helpArticle),
+    hasPublishedChangelog: Boolean(publishedChangelog),
+    hasStatusComponent: Boolean(statusComponent),
     hasIntegration,
     hasFirstWin: firstWin.reached,
     firstWinAt: firstWin.reachedAt,
@@ -455,12 +474,16 @@ export const fetchOnboardingStatus = createServerFn({ method: 'GET' }).handler(a
       brandingManage: permissions.has(PERMISSIONS.SETTINGS_BRANDING),
       integrationManage: permissions.has(PERMISSIONS.INTEGRATION_MANAGE),
       helpCenterManage: permissions.has(PERMISSIONS.HELP_CENTER_MANAGE),
+      assistantManage: permissions.has(PERMISSIONS.ASSISTANT_MANAGE),
     },
     features: {
       supportInbox: flags.supportInbox,
       helpCenter: flags.helpCenter,
       statusPage: flags.statusPage,
+      changelog: flags.changelog,
       integrations: tierLimits.features.integrations,
+      // Quinn can answer only on a plan that includes it and with a model configured.
+      assistant: assistantEntitled && isAssistantConfigured(),
     },
   }
 })
@@ -563,13 +586,16 @@ export const fetchIntegrationByType = createServerFn({ method: 'GET' })
 
     const { integrations } = await import('@/lib/server/db')
     const { getIntegration } = await import('@/lib/server/integrations')
-    const { hasPlatformCredentials } =
+    const { hasPlatformCredentials, arePlatformCredentialsManaged } =
       await import('@/lib/server/domains/platform-credentials/platform-credential.service')
 
     const definition = getIntegration(data.type)
     const platformCredentialFields = definition?.platformCredentials ?? []
+    const platformCredentialsManaged = await arePlatformCredentialsManaged(data.type)
     const platformCredentialsConfigured =
-      platformCredentialFields.length === 0 || (await hasPlatformCredentials(data.type))
+      platformCredentialFields.length === 0 ||
+      (await hasPlatformCredentials(data.type)) ||
+      platformCredentialsManaged
 
     const integration = await db.query.integrations.findFirst({
       where: eq(integrations.integrationType, data.type),
@@ -582,8 +608,10 @@ export const fetchIntegrationByType = createServerFn({ method: 'GET' })
       log.debug({ type: data.type }, 'fetch integration by type not found')
       return {
         integration: null,
+        syncHistoryAvailable: false,
         platformCredentialFields,
         platformCredentialsConfigured,
+        platformCredentialsManaged,
       }
     }
 
@@ -625,6 +653,23 @@ export const fetchIntegrationByType = createServerFn({ method: 'GET' })
     }
 
     const notificationChannels = [...channelMap.values()]
+    const { readSyncHealth } = await import('@/lib/server/integrations/sync/health')
+    const {
+      connectionIsDestination,
+      readSlackAssistantEnabled,
+      syncHistoryAvailable,
+      writesLedger,
+    } = await import('@/lib/server/integrations/sync/availability')
+    const syncHealth = await readSyncHealth(integration)
+    const syncHistoryAvailableFlag = syncHistoryAvailable({
+      provider: data.type,
+      status: integration.status,
+      config: integrationConfig,
+      notificationChannels,
+      writesLedger: writesLedger(definition),
+      connectionIsDestination: connectionIsDestination(definition),
+      slackAssistantEnabled: await readSlackAssistantEnabled(data.type),
+    }).available
 
     return {
       integration: {
@@ -638,17 +683,18 @@ export const fetchIntegrationByType = createServerFn({ method: 'GET' })
           enabled: m.enabled,
         })),
         notificationChannels,
-        // Per-integration health telemetry (IF WO-14 columns): last successful
-        // outbound delivery, last inbound webhook, and last recorded error.
+        // Sync outcomes belong to the current installation; connection errors
+        // remain independent of successful or failed deliveries.
         health: {
-          lastOutboundAt: integration.lastOutboundAt?.toISOString() ?? null,
-          lastInboundAt: integration.lastInboundAt?.toISOString() ?? null,
+          ...syncHealth,
           lastError: integration.lastError ?? null,
           lastErrorAt: integration.lastErrorAt?.toISOString() ?? null,
         },
       },
+      syncHistoryAvailable: syncHistoryAvailableFlag,
       platformCredentialFields,
       platformCredentialsConfigured,
+      platformCredentialsManaged,
     }
   })
 
@@ -662,7 +708,7 @@ export const fetchIntegrationByType = createServerFn({ method: 'GET' })
  * `getRegisteredOidcProviderIds` gate the auth engine and enforcement use
  * (enabled + credentials + `customOidcProvider` tier). It is scoped to `'sso'`
  * specifically because the onboarding button hardcodes
- * `signIn.oauth2({ providerId: 'sso' })`: a true here must mean *that* provider
+ * `signIn.social({ provider: 'sso' })`: a true here must mean *that* provider
  * is callable, not merely that some other (`custom-oidc` / `oidc_*`) provider
  * exists. Reading the registry (not the legacy `authConfig.ssoOidc` blob) means
  * the legacy-config cleanup can run without breaking the button. In practice
@@ -706,9 +752,11 @@ export const checkOnboardingState = createServerFn({ method: 'GET' }).handler(as
       // caller to route. A boolean here would be a fact nobody checked, and the
       // wrong one is the one that lets someone through.
       setupOpenToClaim: null,
+      setupClosedReason: null,
       hasSettings: false,
       setupState: null,
       isOnboardingComplete: false,
+      platformHostname: null,
     }
   }
 
@@ -727,11 +775,24 @@ export const checkOnboardingState = createServerFn({ method: 'GET' }).handler(as
   // is decided — so a caller who is not already one has nothing to finish here.
   // Reported, never acted on: the promoter decides again under its own lock.
   const setupOpenToClaim = await isOpenToBootstrapClaim(db)
+  // Why a caller who is not already admin cannot claim setup here, matching the
+  // claim screen and the promoter: provisioned first, then a finished setup.
+  // Kept apart from `setupOpenToClaim`, which the workspace step reads as
+  // "created by a control plane"; a finished self-hosted install is not that.
+  const setupClosedReason: 'provisioned' | 'setupComplete' | null = !setupOpenToClaim
+    ? 'provisioned'
+    : !(await isSetupOpenToClaim(db))
+      ? 'setupComplete'
+      : null
 
   // Get settings to check setup state
   const currentSettings = await getSettings()
   const setupState = getSetupState(currentSettings?.setupState ?? null)
   const isOnboardingComplete = checkComplete(setupState)
+  const { parseIdentityProjection } =
+    await import('@/lib/server/domains/settings/cloud/identity-projection')
+  const platformHostname =
+    parseIdentityProjection(currentSettings?.cloudIdentity)?.platformHostname ?? null
 
   log.debug(
     {
@@ -739,6 +800,7 @@ export const checkOnboardingState = createServerFn({ method: 'GET' }).handler(as
       is_complete: isOnboardingComplete,
       claimed_by_other: setupClaimedByOther,
       open_to_claim: setupOpenToClaim,
+      closed_reason: setupClosedReason,
     },
     'check onboarding state'
   )
@@ -752,9 +814,11 @@ export const checkOnboardingState = createServerFn({ method: 'GET' }).handler(as
       : null,
     setupClaimedByOther,
     setupOpenToClaim,
+    setupClosedReason,
     hasSettings: !!currentSettings,
     setupState,
     isOnboardingComplete,
+    platformHostname,
   }
 })
 
@@ -801,6 +865,22 @@ export const listPortalUsersFn = createServerFn({ method: 'GET' })
     }
   })
 
+/** A portal user's details with their dates serialized for the client. */
+export function serializePortalUserDetail(detail: PortalUserDetail) {
+  return {
+    ...detail,
+    joinedAt: detail.joinedAt.toISOString(),
+    createdAt: detail.createdAt.toISOString(),
+    engagedPosts: detail.engagedPosts.map((post) => ({
+      ...post,
+      createdAt: post.createdAt.toISOString(),
+      engagedAt: post.engagedAt.toISOString(),
+    })),
+  }
+}
+
+export type PortalUserDetailDTO = ReturnType<typeof serializePortalUserDetail>
+
 /**
  * Get a portal user's details.
  */
@@ -812,23 +892,13 @@ export const getPortalUserFn = createServerFn({ method: 'GET' })
 
     const result = await getPortalUserDetail(data.principalId as PrincipalId)
 
-    // Serialize Date fields for client
     if (!result) {
       log.debug({ principal_id: data.principalId }, 'get portal user not found')
       return null
     }
 
     log.debug({ principal_id: data.principalId }, 'get portal user found')
-    return {
-      ...result,
-      joinedAt: result.joinedAt.toISOString(),
-      createdAt: result.createdAt.toISOString(),
-      engagedPosts: result.engagedPosts.map((post) => ({
-        ...post,
-        createdAt: post.createdAt.toISOString(),
-        engagedAt: post.engagedAt.toISOString(),
-      })),
-    }
+    return serializePortalUserDetail(result)
   })
 
 /**
@@ -1587,83 +1657,13 @@ export const evaluateAllSegmentsFn = createServerFn({ method: 'POST' }).handler(
 
 // ============================================
 // User Attribute Definitions
+// (moved to ./user-attributes; re-exported here so existing
+// `functions/admin` importers keep working)
 // ============================================
 
-const userAttributeIdSchema = z.object({
-  id: z.string().min(1),
-})
-
-const createUserAttributeSchema = z.object({
-  key: z.string().min(1).max(64),
-  label: z.string().min(1).max(128),
-  description: z.string().max(512).optional(),
-  type: z.enum(['string', 'number', 'boolean', 'date', 'currency']),
-  currencyCode: z
-    .enum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR', 'BRL'])
-    .optional(),
-  externalKey: z.string().max(256).optional().nullable(),
-})
-
-const updateUserAttributeSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1).max(128).optional(),
-  description: z.string().max(512).optional().nullable(),
-  type: z.enum(['string', 'number', 'boolean', 'date', 'currency']).optional(),
-  currencyCode: z
-    .enum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR', 'BRL'])
-    .optional()
-    .nullable(),
-  externalKey: z.string().max(256).optional().nullable(),
-})
-
-/**
- * List all user attribute definitions.
- */
-export const listUserAttributesFn = createServerFn({ method: 'GET' }).handler(async () => {
-  await requireAuth({ permission: PERMISSIONS.USER_ATTRIBUTE_VIEW })
-  return listUserAttributes()
-})
-
-/**
- * Create a new user attribute definition.
- */
-export const createUserAttributeFn = createServerFn({ method: 'POST' })
-  .validator(createUserAttributeSchema)
-  .handler(async ({ data }) => {
-    await requireAuth({ permission: PERMISSIONS.USER_ATTRIBUTE_MANAGE })
-    return createUserAttribute({
-      key: data.key,
-      label: data.label,
-      description: data.description,
-      type: data.type,
-      currencyCode: data.currencyCode,
-      externalKey: data.externalKey,
-    })
-  })
-
-/**
- * Update an existing user attribute definition.
- */
-export const updateUserAttributeFn = createServerFn({ method: 'POST' })
-  .validator(updateUserAttributeSchema)
-  .handler(async ({ data }) => {
-    await requireAuth({ permission: PERMISSIONS.USER_ATTRIBUTE_MANAGE })
-    return updateUserAttribute(data.id as UserAttributeId, {
-      label: data.label,
-      description: data.description,
-      type: data.type,
-      currencyCode: data.currencyCode,
-      externalKey: data.externalKey,
-    })
-  })
-
-/**
- * Delete a user attribute definition.
- */
-export const deleteUserAttributeFn = createServerFn({ method: 'POST' })
-  .validator(userAttributeIdSchema)
-  .handler(async ({ data }) => {
-    await requireAuth({ permission: PERMISSIONS.USER_ATTRIBUTE_MANAGE })
-    await deleteUserAttribute(data.id as UserAttributeId)
-    return { deleted: true }
-  })
+export {
+  listUserAttributesFn,
+  createUserAttributeFn,
+  updateUserAttributeFn,
+  deleteUserAttributeFn,
+} from './user-attributes'

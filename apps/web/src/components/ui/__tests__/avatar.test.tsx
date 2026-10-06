@@ -34,8 +34,8 @@ describe('Avatar (simple API)', () => {
     const img = screen.getByRole('img')
     expect(img).toHaveAttribute('src', 'https://example.com/a.png')
     expect(img).toHaveAttribute('alt', 'Jane Doe')
-    // Prioritize the avatar fetch among page resources.
-    expect(img).toHaveAttribute('fetchpriority', 'high')
+    expect(img).toHaveAttribute('loading', 'lazy')
+    expect(img).toHaveAttribute('decoding', 'async')
   })
 
   // The <img> must be in the server-rendered HTML so the browser fetches it
@@ -55,6 +55,15 @@ describe('Avatar (simple API)', () => {
     fireEvent.load(screen.getByRole('img'))
     expect(screen.queryByText('JD')).not.toBeInTheDocument()
     expect(screen.getByRole('img')).toBeInTheDocument()
+  })
+
+  // A pending or failing request must never paint the browser's broken-image
+  // glyph over the initials: the image stays invisible until it has loaded.
+  it('keeps the image invisible until it has loaded', () => {
+    render(<Avatar src="https://example.com/a.png" name="Jane Doe" />)
+    expect(screen.getByRole('img')).toHaveClass('opacity-0')
+    fireEvent.load(screen.getByRole('img'))
+    expect(screen.getByRole('img')).not.toHaveClass('opacity-0')
   })
 
   it('drops the image and shows initials when it fails to load', () => {

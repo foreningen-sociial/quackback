@@ -25,8 +25,8 @@ import { sendingAs } from './brands'
  * The SES rung, offline. Every send here goes through an injected client or a
  * mocked SDK client class; nothing in this file may touch the network.
  *
- * Two properties carry most of the weight. The ladder order is a compatibility
- * promise (an install that named an SMTP host keeps it), and the ladder is
+ * Two properties carry most of the weight. Exactly one provider is selected
+ * (two configured is refused rather than ranked), and the selection is
  * whole-process with no per-send exception: SES verifies an identity from a DNS
  * record its owner publishes, so a workspace sending as its own branded domain
  * uses this rung like everything else.
@@ -70,6 +70,7 @@ const ENV_KEYS = [
   'EMAIL_SMTP_HOST',
   'EMAIL_RESEND_API_KEY',
   'RESEND_API_KEY',
+  'EMAIL_INBOUND_PROVIDER',
   'EMAIL_FROM',
 ] as const
 
@@ -230,11 +231,11 @@ describe('provider ladder', () => {
     expect(getEmailProvider()).toBe('smtp')
   })
 
-  it('selects ses over smtp when both halves of the credential are set', () => {
+  it('refuses ses and smtp together rather than ranking them', () => {
     process.env.EMAIL_SMTP_HOST = 'smtp.acme.test'
     process.env.EMAIL_SES_ACCESS_KEY_ID = 'AKIAEXAMPLE'
     process.env.EMAIL_SES_SECRET_ACCESS_KEY = 'secret'
-    expect(getEmailProvider()).toBe('ses')
+    expect(() => getEmailProvider()).toThrow(/EMAIL_SMTP_HOST/)
   })
 
   it('keeps SMTP when only half the SES credential is set', () => {
@@ -250,12 +251,17 @@ describe('provider ladder', () => {
     expect(isSesEmailConfigured()).toBe(false)
   })
 
-  it('does not select a sending provider from an inbound-only key', () => {
-    // The inbound body fetch keeps its own credential. It carries no mail out,
-    // so holding it must not make an install look like it can send.
-    process.env.EMAIL_RESEND_API_KEY = 're_test'
+  it('sends through Resend from a lone Resend key', () => {
     process.env.RESEND_API_KEY = 're_test'
-    expect(getEmailProvider()).toBe('console')
+    expect(getEmailProvider()).toBe('resend')
+  })
+
+  it('keeps SES sending when the Resend key is declared inbound-only', () => {
+    process.env.EMAIL_SES_ACCESS_KEY_ID = 'AKIAEXAMPLE'
+    process.env.EMAIL_SES_SECRET_ACCESS_KEY = 'secret'
+    process.env.EMAIL_RESEND_API_KEY = 're_test'
+    process.env.EMAIL_INBOUND_PROVIDER = 'resend'
+    expect(getEmailProvider()).toBe('ses')
   })
 })
 
@@ -342,6 +348,57 @@ describe('configuration that cannot send', () => {
       })
     ).rejects.toMatchObject({ name: 'EmailConfigError', retryable: false })
     expect(sdkSend).not.toHaveBeenCalled()
+  })
+})
+
+describe('sendViaSes attachments', () => {
+  it('carries real files on the Simple content Attachments list', async () => {
+    const { client, commands } = acceptingClient('ses-assigned-1')
+    const content = new TextEncoder().encode('%PDF-1.4 fake')
+    await sendViaSes(
+      {
+        from: 'hi@platform.test',
+        to: 'a@b.test',
+        subject: 's',
+        html: '<p>hi</p>',
+        attachments: [{ filename: 'invoice.pdf', contentType: 'application/pdf', content }],
+      },
+      DEPS(client)
+    )
+
+    expect(sentSimple(commands)?.Attachments).toEqual([
+      {
+        RawContent: content,
+        FileName: 'invoice.pdf',
+        ContentType: 'application/pdf',
+        ContentDisposition: 'ATTACHMENT',
+      },
+    ])
+  })
+
+  it('omits the Attachments field entirely when there are none', async () => {
+    const { client, commands } = acceptingClient('ses-assigned-1')
+    await sendViaSes({ from: 'hi@platform.test', to: 'a@b.test', subject: 's' }, DEPS(client))
+    expect(sentSimple(commands)).not.toHaveProperty('Attachments')
+  })
+
+  it('carries more than one attachment, in order', async () => {
+    const { client, commands } = acceptingClient('ses-assigned-1')
+    const a = new TextEncoder().encode('aaa')
+    const b = new TextEncoder().encode('bbbbb')
+    await sendViaSes(
+      {
+        from: 'hi@platform.test',
+        to: 'a@b.test',
+        subject: 's',
+        attachments: [
+          { filename: 'a.txt', contentType: 'text/plain', content: a },
+          { filename: 'b.txt', contentType: 'text/plain', content: b },
+        ],
+      },
+      DEPS(client)
+    )
+    expect(sentSimple(commands)?.Attachments?.map((x) => x.FileName)).toEqual(['a.txt', 'b.txt'])
   })
 })
 
@@ -902,6 +959,51 @@ describe('dispatch on the ses rung', () => {
     expect(command.input.Content?.Simple?.Body?.Html?.Data).not.toContain('Unsubscribe')
   })
 
+  it('carries attachments all the way from sendRawEmail to the SES wire shape', async () => {
+    const content = new TextEncoder().encode('id,name\n1,ada')
+    await sendRawEmail({
+      from: sendingAs('Support <support@platform.test>'),
+      to: 'customer@example.test',
+      subject: 's',
+      html: '<p>see attached</p>',
+      attachments: [{ filename: 'export.csv', contentType: 'text/csv', content }],
+    })
+    const command = sdkSend.mock.calls[0][0] as SendEmailCommand
+    expect(command.input.Content?.Simple?.Attachments).toEqual([
+      {
+        RawContent: content,
+        FileName: 'export.csv',
+        ContentType: 'text/csv',
+        ContentDisposition: 'ATTACHMENT',
+      },
+    ])
+  })
+
+  it('carries attachments through sendConversationMessageEmail as well', async () => {
+    process.env.EMAIL_FROM = 'notifications@platform.test'
+    const content = new TextEncoder().encode('fake-bytes')
+    await sendConversationMessageEmail({
+      to: 'customer@example.test',
+      direction: 'agent_reply',
+      senderName: 'Alex',
+      messagePreview: 'see attached',
+      bodyHtml: '<p>see attached</p>',
+      ctaUrl: 'https://acme.example/c',
+      workspaceName: 'Acme',
+      channel: 'email',
+      attachments: [{ filename: 'photo.png', contentType: 'image/png', content }],
+    })
+    const command = sdkSend.mock.calls[0][0] as SendEmailCommand
+    expect(command.input.Content?.Simple?.Attachments).toEqual([
+      {
+        RawContent: content,
+        FileName: 'photo.png',
+        ContentType: 'image/png',
+        ContentDisposition: 'ATTACHMENT',
+      },
+    ])
+  })
+
   it('still refuses a synthetic anonymous recipient before any request', async () => {
     const result = await sendRawEmail({
       from: sendingAs('Support <support@platform.test>'),
@@ -929,9 +1031,6 @@ describe('a workspace sending as its own domain', () => {
     process.env.EMAIL_SES_ACCESS_KEY_ID = 'AKIAEXAMPLE'
     process.env.EMAIL_SES_SECRET_ACCESS_KEY = 'secret'
     process.env.EMAIL_SES_REGION = 'us-east-1'
-    // Configured so a fall-through would be visible as a rung that was taken
-    // instead. Nothing may reach it.
-    process.env.EMAIL_SMTP_HOST = 'smtp.invalid.test'
   })
 
   it('sends a customer-owned From through SES rather than dropping a rung', async () => {

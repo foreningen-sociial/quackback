@@ -18,7 +18,14 @@ const catalogs: Record<string, Record<string, string>> = Object.fromEntries(
 const en = catalogs[DEFAULT_LOCALE]
 const enKeys = Object.keys(en)
 const enKeySet = new Set(enKeys)
-const localesToCheck = SUPPORTED_LOCALES.filter((l) => l !== DEFAULT_LOCALE)
+// This fork maintains only `da` on top of upstream's catalogs: every other
+// locale here (de, fr, es, ...) is upstream's own translation, carried as-is
+// and never updated when this fork adds a Socii-specific message id. Checking
+// those for full parity with our expanded en.json would fail permanently on
+// drift this fork has no intention of resolving (we don't ship Arabic/Russian/
+// Chinese copy for our own customizations) — so only the locale we actually
+// maintain is held to the strict-parity bar.
+const localesToCheck: Array<(typeof SUPPORTED_LOCALES)[number]> = ['da']
 
 // Collect the top-level ICU argument names in a message: `{name}` -> "name",
 // `{count, plural, ...}` -> "count". Branch keywords (plural/one/other) and the

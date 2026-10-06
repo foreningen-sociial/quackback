@@ -34,19 +34,6 @@ export async function enforceSeatLimit(opts?: {
     limit: 'maxTeamSeats',
     current,
     max: limits.maxTeamSeats,
-    message: await seatCapMessage(limits.maxTeamSeats),
+    message: `You've reached your plan's team seats limit (${limits.maxTeamSeats}). Upgrade to add more.`,
   })
-}
-
-async function seatCapMessage(limit: number): Promise<string> {
-  try {
-    const { getCloudConfig } = await import('@/lib/server/domains/settings/cloud/cloud.service')
-    const cloud = await getCloudConfig()
-    if (cloud.enabled && cloud.plan && cloud.plan !== 'free' && !cloud.trialActive) {
-      return `All ${limit} seats are in use. Add a seat to invite more.`
-    }
-  } catch {
-    // Fall through to the generic upgrade sentence.
-  }
-  return `You've reached your plan's team seats limit (${limit}). Upgrade to add more.`
 }

@@ -7,8 +7,14 @@
  * was invisible; on a page that stays mounted it is a screen that has signed
  * you in and still says it is working.
  */
+import { createElement, type ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+import { IntlProvider } from 'react-intl'
+
+function wrapper({ children }: { children: ReactNode }) {
+  return createElement(IntlProvider, { locale: 'en-GB', messages: {} }, children)
+}
 
 const hoisted = vi.hoisted(() => ({ emailOtp: vi.fn() }))
 vi.mock('@/lib/client/auth-client', () => ({
@@ -23,7 +29,9 @@ describe('useEmailSignin.verify', () => {
   it('stops loading once the code is accepted', async () => {
     hoisted.emailOtp.mockResolvedValue({ data: {}, error: null })
     const onSuccess = vi.fn()
-    const { result } = renderHook(() => useEmailSignin({ callbackUrl: '/onboarding', onSuccess }))
+    const { result } = renderHook(() => useEmailSignin({ callbackUrl: '/onboarding', onSuccess }), {
+      wrapper,
+    })
 
     await act(async () => {
       await result.current.verify('someone@example.com', '123456')
@@ -39,7 +47,9 @@ describe('useEmailSignin.verify', () => {
       error: { message: 'Invalid or expired code' },
     })
     const onSuccess = vi.fn()
-    const { result } = renderHook(() => useEmailSignin({ callbackUrl: '/onboarding', onSuccess }))
+    const { result } = renderHook(() => useEmailSignin({ callbackUrl: '/onboarding', onSuccess }), {
+      wrapper,
+    })
 
     await act(async () => {
       await result.current.verify('someone@example.com', '123456')
@@ -56,7 +66,9 @@ describe('useEmailSignin.verify', () => {
   it('can verify again after a success', async () => {
     hoisted.emailOtp.mockResolvedValue({ data: {}, error: null })
     const onSuccess = vi.fn()
-    const { result } = renderHook(() => useEmailSignin({ callbackUrl: '/onboarding', onSuccess }))
+    const { result } = renderHook(() => useEmailSignin({ callbackUrl: '/onboarding', onSuccess }), {
+      wrapper,
+    })
 
     await act(async () => {
       await result.current.verify('someone@example.com', '123456')

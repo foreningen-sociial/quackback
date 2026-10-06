@@ -16,6 +16,7 @@ const assistantMock = vi.hoisted(() => ({
   loadConversationThread: vi.fn(async () => [
     { id: 'conversation_message_1', senderType: 'visitor', content: 'hi', author: null },
   ]),
+  loadThreadFileExcerpts: vi.fn(async () => new Map()),
   mapRowsToThreadMessages: vi.fn(() => [{ sender: 'customer', content: 'hi' }]),
   respondEligible: vi.fn(() => true),
   getActiveInvolvement: vi.fn(async () => null as { id: string; escalationOfferedAt: Date } | null),
@@ -83,6 +84,7 @@ vi.mock('@/lib/server/domains/conversation-attributes/conversation-attribute.ser
 
 vi.mock('@/lib/server/realtime/conversation-channels', () => ({
   publishConversationEvent: vi.fn(),
+  publishConversationMessage: vi.fn(),
   publishAgentConversationEvent: vi.fn(),
   publishConversationUpdate: vi.fn(),
   publishTyping: vi.fn(),
@@ -122,6 +124,14 @@ vi.mock('../conversation.query', () => ({
   })),
   authorFromInput: vi.fn((a: { principalId: string }) => ({ principalId: a.principalId })),
   resolveAuthor: vi.fn(async (a: { principalId: string }) => ({ principalId: a.principalId })),
+  resolveAuthorAudiences: vi.fn(async (a: { principalId: string; displayName?: string | null }) => {
+    const author = {
+      principalId: a.principalId,
+      displayName: a.displayName ?? null,
+      avatarUrl: null,
+    }
+    return { publicAuthor: author, supportAuthor: author }
+  }),
   loadAuthors: vi.fn(async () => new Map()),
 }))
 
@@ -228,7 +238,7 @@ const V2_IDENTITY: DeliveredFields['identity'] = {
 // Durable trace fixtures contain only bounded config metadata and tool names/outcomes,
 // never prompts, customer text, tool arguments, or tool results.
 const PRIVACY_SAFE_TRACE: DeliveredFields['trace'] = {
-  promptVersion: 'support-agent-v4',
+  promptVersion: 'support-agent-v6',
   configRevision: 12,
   role: 'customer_support',
   tone: 'balanced',
@@ -350,8 +360,8 @@ describe('runAssistantTurnForConversation gate', () => {
         requiredPlanArticle: 'a',
         currentPlan: 'free',
         currentPlanName: 'Free',
-        requiredPlan: 'growth',
-        requiredPlanName: 'Growth',
+        requiredPlan: 'pro',
+        requiredPlanName: 'Pro',
       })
     )
     await runAssistantTurnForConversation(CONV)

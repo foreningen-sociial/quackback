@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowPathIcon } from '@heroicons/react/24/solid'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
+import { useMutation } from '@tanstack/react-query'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { SettingRow } from '@/components/admin/settings/setting-row'
+import { SettingsCard } from '@/components/admin/settings/settings-card'
+import { AUTOSAVE } from '@/lib/client/autosave'
 import {
   catalogByGroup,
   catalogForSurface,
@@ -34,7 +36,8 @@ const GROUP_LABEL_IDS: Record<NotificationGroup, { id: string; defaultMessage: s
   },
 }
 
-const CHANNEL_LABEL_IDS: Record<NotificationChannel, { id: string; defaultMessage: string }> = {
+// Push is not offered until it is delivered.
+const CHANNEL_LABEL_IDS = {
   inApp: {
     id: 'portal.settings.preferences.notifications.channel.inApp',
     defaultMessage: 'In-app',
@@ -43,21 +46,34 @@ const CHANNEL_LABEL_IDS: Record<NotificationChannel, { id: string; defaultMessag
     id: 'portal.settings.preferences.notifications.channel.email',
     defaultMessage: 'Email',
   },
-  push: {
-    id: 'portal.settings.preferences.notifications.channel.push',
-    defaultMessage: 'Push',
-  },
-}
+} as const satisfies Partial<Record<NotificationChannel, { id: string; defaultMessage: string }>>
 
-/** One notification-type × channel matrix, grouped into per-group tabs. */
-export function NotificationMatrixForm({ surface }: { surface: 'admin' | 'portal' }) {
+/**
+ * One notification-type x channel matrix, grouped into per-group tabs.
+ *
+ * `initialPreferences`: when the caller's own loader already fetched these
+ * (the portal preferences page and the admin notifications page fold this
+ * into their document response, since a separate post-hydration request would
+ * redo the session/principal lookup that loader already paid for), pass the
+ * result here to skip the mount fetch. Without it, or when the loader's read
+ * failed (null), the form fetches on mount.
+ */
+export function NotificationMatrixForm({
+  surface,
+  initialPreferences,
+}: {
+  surface: 'admin' | 'portal'
+  initialPreferences?: NotificationPreferences | null
+}) {
   const intl = useIntl()
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState<string | null>(null)
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(
+    initialPreferences ?? null
+  )
+  const [loading, setLoading] = useState(!initialPreferences)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (initialPreferences) return
     let cancelled = false
     async function fetchPreferences() {
       try {
@@ -82,7 +98,11 @@ export function NotificationMatrixForm({ surface }: { surface: 'admin' | 'portal
     return () => {
       cancelled = true
     }
-  }, [intl])
+    // initialPreferences is a loader-time snapshot: intentionally excluded so a
+    // later prop identity change (there isn't one across this form's lifetime)
+    // never re-triggers the mount fetch it was meant to replace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const groups = useMemo(() => {
     const grouped = catalogByGroup(catalogForSurface(surface))
@@ -95,67 +115,44 @@ export function NotificationMatrixForm({ surface }: { surface: 'admin' | 'portal
     () => groups[0]?.group
   )
 
+  // Every change saves on toggle; a failure reverts the switch and the global
+  // autosave handler shows the one toast.
+  const save = useMutation({
+    meta: AUTOSAVE,
+    mutationFn: (input: { matrix: NotificationMatrix } | { emailMuted: boolean }) =>
+      updateNotificationPreferencesFn({ data: input }),
+    onMutate: () => ({ previous: preferences }),
+    onSuccess: (result) => setPreferences(result),
+    onError: (_error, _input, context) => {
+      if (context?.previous) setPreferences(context.previous)
+    },
+  })
+
   // Toggle a single (type, channel) cell. The server persists whatever
   // matrix it's handed, so we read-modify-write the full object here.
   const setCell = useCallback(
-    async (type: string, channel: NotificationChannel, checked: boolean) => {
+    (type: string, channel: NotificationChannel, checked: boolean) => {
       if (!preferences) return
-      const cellKey = `${type}:${channel}`
       const prevMatrix = preferences.matrix
       const nextMatrix: NotificationMatrix = {
         ...prevMatrix,
         [type]: { ...prevMatrix?.[type], [channel]: checked },
       }
-
-      setSaving(cellKey)
-      setError(null)
-      setPreferences((prev) => (prev ? { ...prev, matrix: nextMatrix } : prev))
-
-      try {
-        const result = await updateNotificationPreferencesFn({ data: { matrix: nextMatrix } })
-        setPreferences(result)
-      } catch (err) {
-        setPreferences((prev) => (prev ? { ...prev, matrix: prevMatrix } : prev))
-        setError(
-          err instanceof Error
-            ? err.message
-            : intl.formatMessage({
-                id: 'portal.settings.preferences.notifications.saveFailed',
-                defaultMessage: 'Failed to save preference',
-              })
-        )
-      } finally {
-        setSaving(null)
-      }
+      setPreferences({ ...preferences, matrix: nextMatrix })
+      save.mutate({ matrix: nextMatrix })
     },
-    [preferences, intl]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [preferences]
   )
 
   const setEmailMuted = useCallback(
-    async (checked: boolean) => {
+    (checked: boolean) => {
       if (!preferences) return
-      setSaving('emailMuted')
-      setError(null)
-      setPreferences((prev) => (prev ? { ...prev, emailMuted: checked } : prev))
-
-      try {
-        const result = await updateNotificationPreferencesFn({ data: { emailMuted: checked } })
-        setPreferences(result)
-      } catch (err) {
-        setPreferences((prev) => (prev ? { ...prev, emailMuted: !checked } : prev))
-        setError(
-          err instanceof Error
-            ? err.message
-            : intl.formatMessage({
-                id: 'portal.settings.preferences.notifications.saveFailed',
-                defaultMessage: 'Failed to save preference',
-              })
-        )
-      } finally {
-        setSaving(null)
-      }
+      setPreferences({ ...preferences, emailMuted: checked })
+      save.mutate({ emailMuted: checked })
     },
-    [preferences, intl]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [preferences]
   )
 
   if (loading) {
@@ -178,49 +175,53 @@ export function NotificationMatrixForm({ surface }: { surface: 'admin' | 'portal
     return null
   }
 
-  const busy = saving !== null
+  const busy = save.isPending
+  // The admin page header shows the save status; the portal has none, so the
+  // pause switch carries its own.
+  const savingEmailMuted = busy && !!save.variables && 'emailMuted' in save.variables
 
   return (
     <div className="space-y-6">
-      {error && (
-        <div className="rounded-lg bg-destructive/10 p-3">
-          <p className="text-sm text-destructive">{error}</p>
-        </div>
-      )}
-
       {/* Master email kill switch - overrides every "email" cell below. */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-border/50">
-        <div className="pr-4">
-          <p className="text-sm font-medium">
+      <Panel surface={surface} divided>
+        <SettingRow
+          label={
             <FormattedMessage
               id="portal.settings.preferences.notifications.pauseEmail.title"
               defaultMessage="Pause all email"
             />
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          }
+          description={
             <FormattedMessage
               id="portal.settings.preferences.notifications.pauseEmail.description"
               defaultMessage="Turn off email delivery for every notification type below. In-app notifications keep working."
             />
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {saving === 'emailMuted' && (
-            <ArrowPathIcon className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          )}
-          <Switch
-            aria-label={intl.formatMessage({
-              id: 'portal.settings.preferences.notifications.pauseEmail.ariaLabel',
-              defaultMessage: 'Pause all email notifications',
-            })}
-            checked={preferences.emailMuted}
-            onCheckedChange={setEmailMuted}
-            disabled={busy}
-          />
-        </div>
-      </div>
+          }
+          control={
+            <>
+              {surface === 'portal' && savingEmailMuted && (
+                <span role="status" aria-label="Saving" className="inline-flex">
+                  <ArrowPathIcon className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                </span>
+              )}
+              <Switch
+                aria-label={intl.formatMessage({
+                  id: 'portal.settings.preferences.notifications.pauseEmail.ariaLabel',
+                  defaultMessage: 'Pause all email notifications',
+                })}
+                checked={preferences.emailMuted}
+                onCheckedChange={setEmailMuted}
+                disabled={busy}
+              />
+            </>
+          }
+          className="py-0"
+        />
+      </Panel>
 
       <Tabs
+        variant="line"
+        className="space-y-6"
         value={activeGroup}
         onValueChange={(value) => setActiveGroup(value as NotificationGroup)}
       >
@@ -233,18 +234,20 @@ export function NotificationMatrixForm({ surface }: { surface: 'admin' | 'portal
         </TabsList>
         {groups.map(({ group, items }) => (
           <TabsContent key={group} value={group}>
-            <MatrixHeaderRow />
-            <div className="divide-y divide-border/50">
-              {items.map((meta) => (
-                <MatrixRow
-                  key={meta.type}
-                  meta={meta}
-                  matrix={preferences.matrix}
-                  busy={busy}
-                  onToggle={setCell}
-                />
-              ))}
-            </div>
+            <Panel surface={surface}>
+              <MatrixHeaderRow />
+              <div className="divide-y divide-border/50">
+                {items.map((meta) => (
+                  <MatrixRow
+                    key={meta.type}
+                    meta={meta}
+                    matrix={preferences.matrix}
+                    busy={busy}
+                    onToggle={setCell}
+                  />
+                ))}
+              </div>
+            </Panel>
           </TabsContent>
         ))}
       </Tabs>
@@ -252,7 +255,21 @@ export function NotificationMatrixForm({ surface }: { surface: 'admin' | 'portal
   )
 }
 
-const MATRIX_GRID_COLS = 'grid-cols-[1fr_56px_56px_56px]'
+/** Admin sections sit in a card; the portal page is flat. */
+function Panel({
+  surface,
+  divided,
+  children,
+}: {
+  surface: 'admin' | 'portal'
+  divided?: boolean
+  children: React.ReactNode
+}) {
+  if (surface === 'admin') return <SettingsCard>{children}</SettingsCard>
+  return <div className={divided ? 'pb-4 border-b border-border/50' : undefined}>{children}</div>
+}
+
+const MATRIX_GRID_COLS = 'grid-cols-[1fr_64px_64px]'
 
 function MatrixHeaderRow() {
   const intl = useIntl()
@@ -264,15 +281,6 @@ function MatrixHeaderRow() {
       </span>
       <span className="text-center text-xs font-medium text-muted-foreground">
         {intl.formatMessage(CHANNEL_LABEL_IDS.email)}
-      </span>
-      <span className="flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground">
-        {intl.formatMessage(CHANNEL_LABEL_IDS.push)}
-        <Badge size="sm" variant="secondary">
-          <FormattedMessage
-            id="portal.settings.preferences.notifications.channel.push.soon"
-            defaultMessage="Soon"
-          />
-        </Badge>
       </span>
     </div>
   )
@@ -294,7 +302,6 @@ function MatrixRow({
   const emailChecked = matrix?.[meta.type]?.email ?? true
   const inAppLabel = intl.formatMessage(CHANNEL_LABEL_IDS.inApp)
   const emailLabel = intl.formatMessage(CHANNEL_LABEL_IDS.email)
-  const pushLabel = intl.formatMessage(CHANNEL_LABEL_IDS.push)
   // The catalog (lib/shared/notifications/catalog.ts) carries the canonical
   // English copy as label/description; ids are derived from the stable
   // `type` so new notification types need no separate translation wiring.
@@ -330,31 +337,6 @@ function MatrixRow({
           onCheckedChange={(checked) => onToggle(meta.type, 'email', checked)}
           disabled={busy}
         />
-      </div>
-      <div className="flex justify-center">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Switch
-                aria-label={intl.formatMessage(
-                  {
-                    id: 'portal.settings.preferences.notifications.channel.push.ariaLabel',
-                    defaultMessage: '{label} - {push} (coming soon)',
-                  },
-                  { label, push: pushLabel }
-                )}
-                checked={false}
-                disabled
-              />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <FormattedMessage
-              id="portal.settings.preferences.notifications.channel.push.tooltip"
-              defaultMessage="Available with web push"
-            />
-          </TooltipContent>
-        </Tooltip>
       </div>
     </div>
   )

@@ -36,6 +36,7 @@ import {
   SCHEMA_FLOOR_MISCONFIGURED_CODE,
   SCHEMA_FLOOR_REFUSAL_CODE,
 } from '@/lib/server/fleet/schema-floor'
+import { isActivitySignal, noteWorkspaceActivity } from './activity'
 import { isIdentityFailureCode, isKeyCustodyFailureCode } from './fingerprint'
 import { acquireScopeForHost } from './resolver'
 import { requestWorkspaceHost } from './saas-edge-host'
@@ -66,7 +67,12 @@ function refusal(status: number, body: string, extra?: Record<string, string>): 
  * pooled tenancy asserts only that the process can reach the control store, so
  * it needs no workspace either.
  */
-const FLEET_PATHS = ['/api/health', '/api/health/live', '/api/health/ready']
+const FLEET_PATHS = [
+  '/api/health',
+  '/api/health/live',
+  '/api/health/ready',
+  '/api/internal/job-wake',
+]
 
 export { requestWorkspaceHost } from './saas-edge-host'
 
@@ -79,13 +85,21 @@ export async function resolveWorkspaceAndContinue<T>({
   next: () => Promise<T>
   log?: Pick<typeof logger, 'warn' | 'error' | 'info'>
 }): Promise<T | Response> {
-  if (FLEET_PATHS.includes(new URL(request.url).pathname)) return next()
+  const pathname = new URL(request.url).pathname.replace(/\/$/, '') || '/'
+  if (FLEET_PATHS.includes(pathname)) return next()
 
   const host = requestWorkspaceHost(request)
   const acquisition = await acquireScopeForHost(host, 'request')
 
   switch (acquisition.kind) {
     case 'ok':
+      // A served request from someone using the workspace is what keeps it out
+      // of dormancy (`activity.ts`); anonymous reads are crawler noise and do
+      // not count. Not awaited: the stamp is a throttled control-plane write
+      // the request must neither wait on nor fail because of.
+      if (isActivitySignal(request)) {
+        void noteWorkspaceActivity(acquisition.scope.workspace.workspaceKey)
+      }
       return runWithWorkspaceScope(acquisition.scope, next)
 
     case 'unknown_host':

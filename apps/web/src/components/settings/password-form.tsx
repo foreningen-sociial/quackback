@@ -66,7 +66,7 @@ export function PasswordForm({ hasPassword, onSaved }: PasswordFormProps) {
         const result = await authClient.changePassword({
           currentPassword,
           newPassword,
-          revokeOtherSessions: false,
+          revokeOtherSessions: true,
         })
         if (result.error) {
           throw new Error(
@@ -80,15 +80,15 @@ export function PasswordForm({ hasPassword, onSaved }: PasswordFormProps) {
         toast.success(
           intl.formatMessage({
             id: 'portal.settings.profile.password.changed',
-            defaultMessage: 'Password changed',
+            defaultMessage: 'Password changed. Other devices have been signed out.',
           })
         )
       } else {
-        await setPasswordFn({ data: { newPassword } })
+        await setPasswordFn({ data: { newPassword, revokeOtherSessions: true } })
         toast.success(
           intl.formatMessage({
             id: 'portal.settings.profile.password.set',
-            defaultMessage: 'Password set',
+            defaultMessage: 'Password set. Other devices have been signed out.',
           })
         )
       }
@@ -130,12 +130,12 @@ export function PasswordForm({ hasPassword, onSaved }: PasswordFormProps) {
           {hasPassword ? (
             <FormattedMessage
               id="portal.settings.profile.password.changeDescription"
-              defaultMessage="Update your current password"
+              defaultMessage="Update your current password. Other signed-in devices will be signed out."
             />
           ) : (
             <FormattedMessage
               id="portal.settings.profile.password.setDescription"
-              defaultMessage="Add a password to sign in with email and password"
+              defaultMessage="Add a password to sign in with email and password. Other signed-in devices will be signed out."
             />
           )}
         </p>

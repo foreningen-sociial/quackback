@@ -36,11 +36,14 @@ export type AuthBlockCode =
   // generic-oauth plugin and the linking pipeline). These arrive as
   // `?error=<code>` on the errorCallbackURL, not from our pre-checks.
   | 'account_not_linked'
-  // Better-Auth emits this code with a literal apostrophe.
+  // Better Auth 1.7 renamed the apostrophe spelling; keep both so a
+  // leftover 1.6 redirect or a mixed-version hop still renders.
   | "email_doesn't_match"
+  | 'email_does_not_match'
   | 'account_already_linked_to_different_user'
   | 'unable_to_link_account'
   | 'email_is_missing'
+  | 'user_info_is_missing'
   | 'email_not_found'
   | 'state_mismatch'
   | 'please_restart_the_process'
@@ -84,11 +87,15 @@ export const AUTH_BLOCK_MESSAGES: Record<AuthBlockCode, string> = {
     'An account with this email already exists. Sign in with your original method (for example an emailed sign-in link) to confirm it, and your SSO login will be connected.',
   "email_doesn't_match":
     'The identity provider returned a different email than your account. Sign in with an IdP account that uses the same email address.',
+  email_does_not_match:
+    'The identity provider returned a different email than your account. Sign in with an IdP account that uses the same email address.',
   account_already_linked_to_different_user:
     'That identity is already connected to a different account. Sign in with a different IdP account, or contact your administrator.',
   unable_to_link_account: 'Something went wrong while connecting your sign-in. Please try again.',
   email_is_missing:
     "Your identity provider didn't share an email address. Ask your administrator to enable the email scope for this app.",
+  user_info_is_missing:
+    "Your identity provider didn't share a usable profile. Ask your administrator to release an email address, or to map the claim that carries it.",
   email_not_found:
     "Your identity provider didn't share an email address. Ask your administrator to enable the email scope for this app.",
   state_mismatch: 'That sign-in attempt expired or was already used. Please try again.',
@@ -138,9 +145,11 @@ export const AUTH_BLOCK_MESSAGE_IDS: Record<AuthBlockCode, string> = {
   not_team_member: 'portal.auth.error.notTeamMember',
   account_not_linked: 'portal.auth.error.accountNotLinked',
   "email_doesn't_match": 'portal.auth.error.emailDoesntMatch',
+  email_does_not_match: 'portal.auth.error.emailDoesntMatch',
   account_already_linked_to_different_user: 'portal.auth.error.accountAlreadyLinkedToDifferentUser',
   unable_to_link_account: 'portal.auth.error.unableToLinkAccount',
   email_is_missing: 'portal.auth.error.emailMissing',
+  user_info_is_missing: 'portal.auth.error.userInfoMissing',
   email_not_found: 'portal.auth.error.emailMissing',
   state_mismatch: 'portal.auth.error.signinAttemptExpired',
   please_restart_the_process: 'portal.auth.error.signinAttemptExpired',

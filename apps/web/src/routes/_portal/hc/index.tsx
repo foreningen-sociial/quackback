@@ -11,10 +11,10 @@ import {
   listPublicCategoriesFn,
   listPopularPublicArticlesFn,
 } from '@/lib/server/functions/help-center'
-import { resolveHcLandingLocale } from '@/lib/shared/help-center-url'
-import { HC_LOCALE_COOKIE } from '@/components/help-center/help-center-locale-switcher'
+import { HC_LOCALE_COOKIE, resolveHcLandingLocale } from '@/lib/shared/help-center-url'
 import type { HelpCenterConfig } from '@/lib/shared/types/settings'
 import { resolvePortalOgImageUrl } from '@/lib/shared/portal-og-image'
+import { useWorkspaceSettings } from '@/lib/client/hooks/use-root-context'
 
 const DEFAULT_TITLE = 'How can we help?'
 const DEFAULT_DESCRIPTION =
@@ -108,7 +108,7 @@ export const Route = createFileRoute('/_portal/hc/')({
 function HelpCenterLandingPage() {
   const intl = useIntl()
   const { categories, popularArticles, helpCenterConfig } = Route.useLoaderData()
-  const { settings } = Route.useRouteContext()
+  const settings = useWorkspaceSettings()
   const askAiEnabled = !!settings?.featureFlags?.helpCenter
 
   const title = helpCenterConfig?.homepageTitle ?? DEFAULT_TITLE

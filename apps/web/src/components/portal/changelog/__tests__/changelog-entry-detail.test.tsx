@@ -1,7 +1,16 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render as baseRender, screen } from '@testing-library/react'
+import { IntlProvider } from 'react-intl'
 import type { ChangelogId } from '@quackback/ids'
+
+function render(ui: React.ReactElement) {
+  return baseRender(
+    <IntlProvider locale="en-GB" messages={{}}>
+      {ui}
+    </IntlProvider>
+  )
+}
 
 // BackLink renders a router Link; the detail layout is under test here, not
 // navigation, so swap it for a plain anchor.

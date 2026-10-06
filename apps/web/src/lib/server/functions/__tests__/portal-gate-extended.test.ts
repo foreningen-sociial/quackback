@@ -40,6 +40,7 @@
  *   8  topViewedChangelogsFn
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { policyActorFromAuth } from '@/lib/server/functions/auth-helpers'
 
 // ---------------------------------------------------------------------------
 // Shared handler registry
@@ -52,6 +53,7 @@ const handlersByExport = new WeakMap<object, AnyHandler>()
 let _currentModule = ''
 
 vi.mock('@tanstack/react-start', () => ({
+  createServerOnlyFn: <T>(fn: T) => fn,
   createServerFn: () => {
     const chain = {
       validator() {
@@ -99,6 +101,7 @@ const mockGetPublicPostDetail = vi.fn()
 const mockListPublicPosts = vi.fn()
 const mockGetPortalPublicRoadmaps = vi.fn()
 const mockGetPortalPublicRoadmapPosts = vi.fn()
+const mockGetPortalPublicRoadmapColumnsPosts = vi.fn()
 const mockGetPostMergeInfo = vi.fn()
 const mockGetMergedPosts = vi.fn()
 
@@ -139,6 +142,7 @@ vi.mock('@/lib/server/domains/roadmaps/roadmap.service', () => ({
 
 vi.mock('@/lib/server/domains/roadmaps/roadmap.query', () => ({
   getPublicRoadmapPosts: (...a: unknown[]) => mockGetPortalPublicRoadmapPosts(...a),
+  getPublicRoadmapColumnsPosts: (...a: unknown[]) => mockGetPortalPublicRoadmapColumnsPosts(...a),
 }))
 
 vi.mock('@/lib/server/domains/subscriptions/subscription.service', () => ({
@@ -175,13 +179,17 @@ vi.mock('@/lib/server/db', async (importOriginal) => ({
 vi.mock('@/lib/shared/roles', () => ({ isTeamMember: vi.fn().mockReturnValue(false) }))
 
 // The capability gates read the workspace anonymous switch fail-closed from the
-// RAW settings (workspaceAllowsAnonymous), so drive it via getSettings here.
+// RAW settings (workspaceAllowsAnonymous), so drive it via getSettings (and the
+// cached read of the same row) here.
 // getPortalConfig is still mocked for any merged-config consumers.
 vi.mock('@/lib/server/functions/workspace', () => ({
   getSettings: vi.fn().mockResolvedValue({ portalConfig: { features: { allowAnonymous: true } } }),
 }))
 vi.mock('@/lib/server/domains/settings/settings.service', () => ({
   getPortalConfig: vi.fn().mockResolvedValue({ features: { allowAnonymous: true } }),
+  getWorkspaceSettingsRow: vi.fn().mockResolvedValue({
+    portalConfig: { features: { allowAnonymous: true } },
+  }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -335,6 +343,22 @@ describe('portal.ts fetchPortalData — portal-visibility gate', () => {
     await h[FETCH_PORTAL_DATA]({ data: { sort: 'top' } })
     expect(mockListPublicBoardsWithStats).toHaveBeenCalledTimes(1)
   })
+
+  it('scopes the tag list to the resolved actor so internal tags stay team-only', async () => {
+    mockResolvePortalAccess.mockResolvedValue({ granted: true, reason: 'public' })
+    mockListPublicBoardsWithStats.mockResolvedValue([])
+    mockListPublicPostsWithVotesAndAvatars.mockResolvedValue({ items: [], hasMore: false })
+    mockListPublicStatuses.mockResolvedValue([])
+    mockListPublicTags.mockResolvedValue([])
+    mockGetVotedPostIdsByUserId.mockResolvedValue(new Set())
+    const actor = { principalId: null, role: null, principalType: 'anonymous' }
+    vi.mocked(policyActorFromAuth).mockResolvedValueOnce(actor as never)
+
+    const h = await loadModule(PORTAL)
+    await h[FETCH_PORTAL_DATA]({ data: { sort: 'top' } })
+    expect(mockListPublicTags).toHaveBeenCalledTimes(1)
+    expect(mockListPublicTags).toHaveBeenCalledWith(actor)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -356,27 +380,31 @@ describe('portal.ts fetchBoardCapabilitiesFn — per-board capability map', () =
     mockResolvePortalAccess.mockResolvedValue({ granted: false, reason: 'unauthorized' })
     const handler = await loadExportedHandler(PORTAL, 'fetchBoardCapabilitiesFn')
     const result = await handler({ data: {} })
-    expect(result).toEqual({})
+    expect(result).toEqual({ permissions: {}, boards: [] })
     expect(mockListPublicBoardsWithStats).not.toHaveBeenCalled()
   })
 
   it('maps each visible board to its submit/vote capability for the actor', async () => {
     mockResolvePortalAccess.mockResolvedValue({ granted: true, reason: 'public' })
     mockListPublicBoardsWithStats.mockResolvedValue([
-      { id: 'board_pub', access: anonAccess },
-      { id: 'board_auth', access: authAccess },
+      { id: 'board_pub', name: 'Public', slug: 'public', access: anonAccess },
+      { id: 'board_auth', name: 'Auth', slug: 'auth', access: authAccess },
     ])
     const handler = await loadExportedHandler(PORTAL, 'fetchBoardCapabilitiesFn')
-    const result = (await handler({ data: {} })) as Record<
-      string,
-      { canSubmit: boolean; canVote: boolean }
-    >
+    const result = (await handler({ data: {} })) as {
+      permissions: Record<string, { canSubmit: boolean; canVote: boolean }>
+      boards: { id: string; name: string; slug: string }[]
+    }
     // Anonymous actor (mocked) + workspace allowAnonymous=true: the all-anonymous
     // board is actionable, the sign-in-required board is not.
-    expect(result).toEqual({
+    expect(result.permissions).toEqual({
       board_pub: { canSubmit: true, canVote: true },
       board_auth: { canSubmit: false, canVote: false },
     })
+    expect(result.boards).toEqual([
+      { id: 'board_pub', name: 'Public', slug: 'public' },
+      { id: 'board_auth', name: 'Auth', slug: 'auth' },
+    ])
   })
 })
 
@@ -582,6 +610,17 @@ describe('portal.ts fetchPublicTags — portal-visibility gate', () => {
     const result = (await h[FETCH_PUBLIC_TAGS]({ data: {} })) as { id: string }[]
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe('tag_1')
+  })
+
+  it('passes the resolved actor so the service can hide internal tags from non-team viewers', async () => {
+    mockResolvePortalAccess.mockResolvedValue({ granted: true, reason: 'public' })
+    mockListPublicTags.mockResolvedValue([])
+    const actor = { principalId: 'principal_1', role: 'member', principalType: 'user' }
+    vi.mocked(policyActorFromAuth).mockResolvedValueOnce(actor as never)
+
+    const h = await loadModule(PORTAL)
+    await h[FETCH_PUBLIC_TAGS]({ data: {} })
+    expect(mockListPublicTags).toHaveBeenCalledWith(actor)
   })
 })
 

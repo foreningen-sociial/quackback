@@ -26,6 +26,7 @@ import { z } from 'zod'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { requireAuth } from './auth-helpers'
+
 import { ValidationError } from '@/lib/shared/errors'
 import { realEmail } from '@/lib/shared/anonymous-email'
 import { logger } from '@/lib/server/logger'
@@ -72,7 +73,8 @@ export const getEmailChangeStateFn = createServerFn({ method: 'GET' }).handler(a
  * to it. Proves the person holds the address they are moving away from.
  */
 export const sendCurrentAddressCodeFn = createServerFn({ method: 'POST' }).handler(async () => {
-  const row = await userRow(await requireAuth())
+  const ctx = await requireAuth()
+  const row = await userRow(ctx)
   const current = realEmail(row.email)
   if (!current) {
     throw new ValidationError('NO_CURRENT_EMAIL', 'This account has no confirmed address yet.')
@@ -84,7 +86,8 @@ export const sendCurrentAddressCodeFn = createServerFn({ method: 'POST' }).handl
   // and burn the workspace's sending reputation.
   const { getClientIp } = await import('@/lib/server/domains/api/rate-limit')
   const { checkContactEmailSendRateLimit } = await import('@/lib/server/auth/signin-rate-limit')
-  const headers = getRequestHeaders()
+  const { withTrustedClientIp } = await import('@/lib/server/auth/client-ip')
+  const headers = withTrustedClientIp(getRequestHeaders())
   const limit = await checkContactEmailSendRateLimit(getClientIp(headers), row.id)
   if (!limit.allowed) {
     throw new ValidationError('RATE_LIMITED', 'Too many attempts. Try again a little later.')
@@ -110,7 +113,8 @@ export const sendCurrentAddressCodeFn = createServerFn({ method: 'POST' }).handl
 export const requestEmailChangeFn = createServerFn({ method: 'POST' })
   .validator(z.object({ email: z.string().max(320), currentCode: z.string().max(16).optional() }))
   .handler(async ({ data }) => {
-    const row = await userRow(await requireAuth())
+    const ctx = await requireAuth()
+    const row = await userRow(ctx)
     const { acceptableContactEmail } = await import('@/lib/server/domains/principals/contact-email')
     const email = acceptableContactEmail(data.email)
     if (!email) throw new ValidationError('VALIDATION_ERROR', 'Enter a valid email address.')
@@ -122,7 +126,8 @@ export const requestEmailChangeFn = createServerFn({ method: 'POST' })
 
     const { getClientIp } = await import('@/lib/server/domains/api/rate-limit')
     const { checkContactEmailSendRateLimit } = await import('@/lib/server/auth/signin-rate-limit')
-    const headers = getRequestHeaders()
+    const { withTrustedClientIp } = await import('@/lib/server/auth/client-ip')
+    const headers = withTrustedClientIp(getRequestHeaders())
     const limit = await checkContactEmailSendRateLimit(getClientIp(headers), row.id)
     if (!limit.allowed) {
       throw new ValidationError('RATE_LIMITED', 'Too many attempts. Try again a little later.')
@@ -197,11 +202,12 @@ export const confirmEmailChangeFn = createServerFn({ method: 'POST' })
     if (holder) return { ok: false as const, reason: 'invalid_or_taken' as const }
 
     const { getAuth } = await import('@/lib/server/auth')
+    const { withTrustedClientIp } = await import('@/lib/server/auth/client-ip')
     const auth = await getAuth()
     try {
       await auth.api.changeEmailEmailOTP({
         body: { newEmail: email, otp: data.code },
-        headers: getRequestHeaders(),
+        headers: withTrustedClientIp(getRequestHeaders()),
       })
     } catch (err) {
       // Either the code is wrong or the address was claimed inside the window.
