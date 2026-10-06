@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { HelpCenterHero } from '@/components/help-center/help-center-hero'
 import { HelpCenterHeroSearch } from '@/components/help-center/help-center-search'
 import { HelpCenterCategoryGrid } from '@/components/help-center/help-center-category-grid'
@@ -55,6 +56,7 @@ export const Route = createFileRoute('/_portal/hc/$locale/')({
 })
 
 function LocaleHelpCenterLandingPage() {
+  const intl = useIntl()
   const { categories, title, description } = Route.useLoaderData()
   const { locale } = Route.useParams()
   const collectionCount = getTopLevelCategories(categories).length
@@ -72,11 +74,17 @@ function LocaleHelpCenterLandingPage() {
       >
         <div className="mb-6 flex items-baseline justify-between gap-4">
           <h2 id="hc-topics" className="text-2xl font-semibold tracking-tight text-foreground">
-            Browse by topic
+            <FormattedMessage id="portal.hc.browseByTopic" defaultMessage="Browse by topic" />
           </h2>
           {collectionCount > 0 && (
             <span className="shrink-0 text-sm text-muted-foreground">
-              {collectionCount} {collectionCount === 1 ? 'collection' : 'collections'}
+              {intl.formatMessage(
+                {
+                  id: 'portal.hc.collectionCount',
+                  defaultMessage: '{count, plural, one {# collection} other {# collections}}',
+                },
+                { count: collectionCount }
+              )}
             </span>
           )}
         </div>

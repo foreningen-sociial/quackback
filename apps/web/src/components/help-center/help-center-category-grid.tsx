@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { getTopLevelCategories } from './help-center-utils'
 import { CategoryIcon } from './category-icon'
 import { DEFAULT_LOCALE } from '@/lib/shared/i18n'
@@ -22,12 +23,16 @@ interface HelpCenterCategoryGridProps {
 }
 
 export function HelpCenterCategoryGrid({ categories, locale }: HelpCenterCategoryGridProps) {
+  const intl = useIntl()
   const topLevel = getTopLevelCategories(categories)
 
   if (topLevel.length === 0) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
-        No categories yet. Check back soon.
+        <FormattedMessage
+          id="portal.hc.categoryGrid.empty"
+          defaultMessage="No categories yet. Check back soon."
+        />
       </div>
     )
   }
@@ -58,7 +63,13 @@ export function HelpCenterCategoryGrid({ categories, locale }: HelpCenterCategor
               </p>
             )}
             <span className="mt-3 block text-xs font-medium text-muted-foreground">
-              {cat.articleCount} {cat.articleCount === 1 ? 'article' : 'articles'}
+              {intl.formatMessage(
+                {
+                  id: 'portal.hc.categoryGrid.articleCount',
+                  defaultMessage: '{count, plural, one {# article} other {# articles}}',
+                },
+                { count: cat.articleCount }
+              )}
             </span>
           </div>
         </Link>

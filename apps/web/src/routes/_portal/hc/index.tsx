@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { createIsomorphicFn } from '@tanstack/react-start'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { HelpCenterHero } from '@/components/help-center/help-center-hero'
 import { HelpCenterHeroSearch } from '@/components/help-center/help-center-search'
@@ -105,6 +106,7 @@ export const Route = createFileRoute('/_portal/hc/')({
 })
 
 function HelpCenterLandingPage() {
+  const intl = useIntl()
   const { categories, popularArticles, helpCenterConfig } = Route.useLoaderData()
   const { settings } = Route.useRouteContext()
   const askAiEnabled = !!settings?.featureFlags?.helpCenter
@@ -126,11 +128,17 @@ function HelpCenterLandingPage() {
       >
         <div className="mb-6 flex items-baseline justify-between gap-4">
           <h2 id="hc-topics" className="text-2xl font-semibold tracking-tight text-foreground">
-            Browse by topic
+            <FormattedMessage id="portal.hc.browseByTopic" defaultMessage="Browse by topic" />
           </h2>
           {collectionCount > 0 && (
             <span className="shrink-0 text-sm text-muted-foreground">
-              {collectionCount} {collectionCount === 1 ? 'collection' : 'collections'}
+              {intl.formatMessage(
+                {
+                  id: 'portal.hc.collectionCount',
+                  defaultMessage: '{count, plural, one {# collection} other {# collections}}',
+                },
+                { count: collectionCount }
+              )}
             </span>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useIntl } from 'react-intl'
 import { BellIcon } from '@heroicons/react/24/outline'
 import { BellIcon as BellIconSolid } from '@heroicons/react/24/solid'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,7 @@ const QUERY_KEY = ['changelog', 'my-subscription'] as const
  * have no email to subscribe) — see the `enabled` check the caller passes.
  */
 export function ChangelogSubscribeButton({ enabled }: { enabled: boolean }) {
+  const intl = useIntl()
   const queryClient = useQueryClient()
   const { data } = useQuery({
     queryKey: QUERY_KEY,
@@ -51,7 +53,17 @@ export function ChangelogSubscribeButton({ enabled }: { enabled: boolean }) {
       ) : (
         <BellIcon className="h-4 w-4" />
       )}
-      <span className="hidden sm:inline">{subscribed ? 'Subscribed' : 'Subscribe'}</span>
+      <span className="hidden sm:inline">
+        {subscribed
+          ? intl.formatMessage({
+              id: 'portal.changelog.subscribe.subscribed',
+              defaultMessage: 'Subscribed',
+            })
+          : intl.formatMessage({
+              id: 'portal.changelog.subscribe.cta',
+              defaultMessage: 'Subscribe',
+            })}
+      </span>
     </Button>
   )
 }
