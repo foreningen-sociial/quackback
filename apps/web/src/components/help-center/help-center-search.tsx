@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useIntl } from 'react-intl'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { MagnifyingGlassIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
 import { Button } from '@/components/ui/button'
 import { contentPreview } from '@/lib/shared/utils/string'
@@ -115,7 +115,10 @@ export function HelpCenterHeroSearch({ askAiEnabled = false, locale }: HelpCente
         id: 'helpAskAi.searchPlaceholder',
         defaultMessage: 'Ask AI or search our help articles to find an answer',
       })
-    : 'Search articles...'
+    : intl.formatMessage({
+        id: 'portal.hc.search.placeholder',
+        defaultMessage: 'Search articles...',
+      })
 
   return (
     <div ref={containerRef} role="search" className="relative w-full">
@@ -212,7 +215,9 @@ export function HelpCenterCompactSearch() {
   return (
     <Button variant="outline" size="sm" className="gap-2 text-muted-foreground" disabled>
       <MagnifyingGlassIcon className="h-4 w-4" />
-      <span className="hidden sm:inline">Search...</span>
+      <span className="hidden sm:inline">
+        <FormattedMessage id="portal.hc.search.compactPlaceholder" defaultMessage="Search..." />
+      </span>
     </Button>
   )
 }

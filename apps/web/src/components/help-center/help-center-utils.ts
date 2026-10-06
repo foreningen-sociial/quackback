@@ -85,10 +85,15 @@ export function buildCategoryBreadcrumbs<T extends CategoryLikeWithSlug>(params:
   articleTitle?: string
   /** Locale for collection URLs. Defaults to `en`. */
   locale?: string
+  /** Root crumb label. Defaults to 'Help Center' — callers with access to
+   *  `useIntl()` should pass a translated string. */
+  rootLabel?: string
 }): Array<{ label: string; href?: string }> {
   const locale = params.locale ?? 'en'
   const chain = buildAncestorChain(params.allCategories, params.categoryId)
-  const items: Array<{ label: string; href?: string }> = [{ label: 'Help Center', href: '/hc' }]
+  const items: Array<{ label: string; href?: string }> = [
+    { label: params.rootLabel ?? 'Help Center', href: '/hc' },
+  ]
 
   if (chain.length === 0) {
     // Unknown id — return just Help Center. The article fallback is

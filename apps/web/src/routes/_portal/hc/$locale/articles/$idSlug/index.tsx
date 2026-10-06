@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi, notFound, redirect } from '@tanstack/react-router'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { formatDistanceToNow } from 'date-fns'
 import { getPublicArticlePageFn } from '@/lib/server/functions/help-center'
 import { RichTextContent, isRichTextContent } from '@/components/ui/rich-text-editor'
@@ -85,6 +86,7 @@ export const Route = createFileRoute('/_portal/hc/$locale/articles/$idSlug/')({
 })
 
 function ArticleDetailPage() {
+  const intl = useIntl()
   const { article, related, category, articles, allCategories } = Route.useLoaderData()
   const { locale } = Route.useParams()
   const { helpCenterConfig } = helpCenterApi.useLoaderData()
@@ -99,6 +101,7 @@ function ArticleDetailPage() {
     categoryId: category.id,
     articleTitle: article.title,
     locale,
+    rootLabel: intl.formatMessage({ id: 'portal.header.nav.help', defaultMessage: 'Help Center' }),
   })
 
   const headings = extractHeadings(article.contentJson)
@@ -174,16 +177,34 @@ function ArticleDetailPage() {
                 <div className="flex flex-col gap-0.5">
                   {article.author && (
                     <span className="text-sm text-muted-foreground">
-                      Written By{' '}
-                      <span className="font-semibold text-foreground">{article.author.name}</span>
+                      <FormattedMessage
+                        id="portal.hc.article.writtenBy"
+                        defaultMessage="Written By {name}"
+                        values={{
+                          name: (
+                            <span className="font-semibold text-foreground">
+                              {article.author.name}
+                            </span>
+                          ),
+                        }}
+                      />
                     </span>
                   )}
                   {article.updatedAt && (
                     <span className="text-sm text-muted-foreground">
-                      Last updated{' '}
-                      <span className="font-semibold text-foreground">
-                        {formatDistanceToNow(new Date(article.updatedAt), { addSuffix: true })}
-                      </span>
+                      <FormattedMessage
+                        id="portal.hc.article.lastUpdated"
+                        defaultMessage="Last updated {time}"
+                        values={{
+                          time: (
+                            <span className="font-semibold text-foreground">
+                              {formatDistanceToNow(new Date(article.updatedAt), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          ),
+                        }}
+                      />
                     </span>
                   )}
                 </div>

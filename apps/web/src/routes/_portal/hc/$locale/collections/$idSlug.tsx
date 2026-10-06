@@ -1,6 +1,7 @@
 import { createFileRoute, getRouteApi, Link, notFound, redirect } from '@tanstack/react-router'
 import { DocumentTextIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
 import { useMemo } from 'react'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { getPublicCollectionPageFn } from '@/lib/server/functions/help-center'
 import { HelpCenterHero } from '@/components/help-center/help-center-hero'
 import { HelpCenterHeroSearch } from '@/components/help-center/help-center-search'
@@ -85,6 +86,7 @@ function ArticleRow({
   description?: string | null
   readingTimeMinutes?: number
 }) {
+  const intl = useIntl()
   return (
     <Link
       to={href as '/hc'}
@@ -103,7 +105,13 @@ function ArticleRow({
       </div>
       {readingTimeMinutes != null && (
         <span className="text-xs text-muted-foreground/50 shrink-0 tabular-nums mt-0.5">
-          {readingTimeMinutes} min read
+          {intl.formatMessage(
+            {
+              id: 'portal.hc.collection.minRead',
+              defaultMessage: '{minutes, plural, one {# min read} other {# min read}}',
+            },
+            { minutes: readingTimeMinutes }
+          )}
         </span>
       )}
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors mt-0.5" />
@@ -112,6 +120,7 @@ function ArticleRow({
 }
 
 function CollectionPage() {
+  const intl = useIntl()
   const { locale } = Route.useParams()
   const { category, articles, allCategories, subcategories } = Route.useLoaderData()
   const { helpCenterConfig } = helpCenterApi.useLoaderData()
@@ -122,6 +131,7 @@ function CollectionPage() {
     allCategories,
     categoryId: category.id,
     locale,
+    rootLabel: intl.formatMessage({ id: 'portal.header.nav.help', defaultMessage: 'Help Center' }),
   })
 
   const seoEnabled = helpCenterConfig?.seo?.structuredDataEnabled !== false
@@ -196,16 +206,36 @@ function CollectionPage() {
                   ))}
                 </div>
                 <span>
-                  By <span className="font-semibold text-foreground">{editors[0].name}</span>
+                  <FormattedMessage
+                    id="portal.hc.collection.byAuthor"
+                    defaultMessage="By {name}"
+                    values={{
+                      name: (
+                        <span className="font-semibold text-foreground">{editors[0].name}</span>
+                      ),
+                    }}
+                  />
                   {editors.length > 1 && (
                     <>
                       {' '}
-                      and {editors.length - 1} other{editors.length > 2 ? 's' : ''}
+                      <FormattedMessage
+                        id="portal.hc.collection.andOthers"
+                        defaultMessage="and {count, plural, one {# other} other {# others}}"
+                        values={{ count: editors.length - 1 }}
+                      />
                     </>
                   )}
                 </span>
                 <span className="text-muted-foreground/40">·</span>
-                <span>{totalArticles} articles</span>
+                <span>
+                  {intl.formatMessage(
+                    {
+                      id: 'portal.hc.collection.articleCount',
+                      defaultMessage: '{count, plural, one {# article} other {# articles}}',
+                    },
+                    { count: totalArticles }
+                  )}
+                </span>
               </div>
             )}
           </div>
@@ -248,13 +278,20 @@ function CollectionPage() {
                               }
                               className="flex items-center justify-center px-5 py-3 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
                             >
-                              View all {sub.articles.length} articles
+                              <FormattedMessage
+                                id="portal.hc.collection.viewAllArticles"
+                                defaultMessage="View all {count, plural, one {# article} other {# articles}}"
+                                values={{ count: sub.articles.length }}
+                              />
                             </Link>
                           )}
                         </>
                       ) : (
                         <p className="px-5 py-3.5 text-sm text-muted-foreground">
-                          No articles yet.
+                          <FormattedMessage
+                            id="portal.hc.collection.subcategoryEmpty"
+                            defaultMessage="No articles yet."
+                          />
                         </p>
                       )}
                     </div>
@@ -265,7 +302,12 @@ function CollectionPage() {
           )}
 
           {articles.length === 0 && (!subcategories || subcategories.length === 0) ? (
-            <p className="text-muted-foreground">No articles in this category yet.</p>
+            <p className="text-muted-foreground">
+              <FormattedMessage
+                id="portal.hc.collection.categoryEmpty"
+                defaultMessage="No articles in this category yet."
+              />
+            </p>
           ) : articles.length > 0 ? (
             <div className="rounded-xl border border-border/50 overflow-hidden divide-y divide-border/50 bg-card">
               {articles.map((article) => (
