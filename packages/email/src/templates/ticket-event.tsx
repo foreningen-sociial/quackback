@@ -128,7 +128,7 @@ export function TicketEventEmail({
       <NotificationFooter
         reason={reason}
         unsubscribeUrl={preferencesUrl ?? ctaUrl}
-        unsubscribeLabel="Manage notification preferences"
+        unsubscribeLabel="Administrer notifikationsindstillinger"
       />
     </EmailLayout>
   )

@@ -28,7 +28,7 @@ export function NoteMentionEmail({
   preferencesUrl,
   logoUrl,
 }: NoteMentionEmailProps) {
-  const displayName = authorName || 'A teammate'
+  const displayName = authorName || 'En kollega'
   const paragraphs = preview
     .split(/\n{2,}/)
     .map((p) => p.trim())
@@ -36,14 +36,12 @@ export function NoteMentionEmail({
 
   return (
     <EmailLayout
-      preview={`${displayName} mentioned you in an internal note`}
+      preview={`${displayName} nævnte dig i en intern note`}
       logoUrl={logoUrl}
       logoAlt={workspaceName}
     >
-      <Heading style={typography.h1}>You were mentioned in a note</Heading>
-      <Text style={typography.text}>
-        {displayName} mentioned you in an internal note on a conversation.
-      </Text>
+      <Heading style={typography.h1}>Du blev nævnt i en note</Heading>
+      <Text style={typography.text}>{displayName} nævnte dig i en intern note på en samtale.</Text>
 
       {paragraphs.length > 0 && (
         <Section
@@ -77,24 +75,24 @@ export function NoteMentionEmail({
       )}
 
       <Text style={{ ...typography.textSmall, color: colors.textMuted }}>
-        Internal notes are visible to your team only.
+        Interne noter er kun synlige for dit team.
       </Text>
 
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
         <Button style={button.primary} href={conversationUrl}>
-          Open conversation
+          Åbn samtale
         </Button>
       </Section>
 
       {preferencesUrl ? (
         <NotificationFooter
-          reason={`You received this email because you were mentioned in ${workspaceName}.`}
+          reason={`Du modtager denne e-mail, fordi du blev nævnt hos ${workspaceName}.`}
           unsubscribeUrl={preferencesUrl}
-          unsubscribeLabel="Manage notification preferences"
+          unsubscribeLabel="Administrer notifikationsindstillinger"
         />
       ) : (
         <Text style={typography.footer}>
-          You received this email because you were mentioned in {workspaceName}.
+          Du modtager denne e-mail, fordi du blev nævnt hos {workspaceName}.
         </Text>
       )}
     </EmailLayout>
