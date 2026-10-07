@@ -32,17 +32,17 @@ export function NewSignInEmail({
   logoUrl,
 }: NewSignInEmailProps) {
   return (
-    <EmailLayout preview="A new sign-in was detected on your account" logoUrl={logoUrl}>
-      <Heading style={typography.h1}>New sign-in to your account</Heading>
+    <EmailLayout preview="Der blev registreret et nyt login på din konto" logoUrl={logoUrl}>
+      <Heading style={typography.h1}>Nyt login på din konto</Heading>
       <Text style={typography.text}>
         {workspaceName
-          ? `Someone just signed in to your ${workspaceName} account on a device we haven't seen before.`
-          : 'Someone just signed in to your account on a device we haven’t seen before.'}
+          ? `Nogen har lige logget ind på din ${workspaceName}-konto fra en enhed, vi ikke har set før.`
+          : 'Nogen har lige logget ind på din konto fra en enhed, vi ikke har set før.'}
       </Text>
 
       <Section style={utils.codeBox}>
         <Text style={typography.text}>
-          <strong>When:</strong> {occurredAt}
+          <strong>Hvornår:</strong> {occurredAt}
         </Text>
         {ipAddress ? (
           <Text style={typography.text}>
@@ -51,12 +51,12 @@ export function NewSignInEmail({
         ) : null}
         {location ? (
           <Text style={typography.text}>
-            <strong>Location:</strong> {location}
+            <strong>Placering:</strong> {location}
           </Text>
         ) : null}
         {userAgent ? (
           <Text style={typography.text}>
-            <strong>Device:</strong> {userAgent}
+            <strong>Enhed:</strong> {userAgent}
           </Text>
         ) : null}
       </Section>
@@ -65,27 +65,27 @@ export function NewSignInEmail({
 
       <Text style={typography.text}>
         {ssoEnforced ? (
-          'If that was you, no action needed. If it wasn’t, change your password at your identity provider and ask a workspace admin to sign out other sessions.'
+          'Hvis det var dig, behøver du ikke gøre noget. Hvis det ikke var dig, så skift din adgangskode hos din identitetsudbyder, og bed en administrator om at logge andre sessioner ud.'
         ) : (
           <>
-            If that was you, no action needed. If it wasn’t,{' '}
+            Hvis det var dig, behøver du ikke gøre noget. Hvis det ikke var dig,{' '}
             {settingsUrl ? (
               <>
                 <Link href={settingsUrl} style={utils.link}>
-                  set or change your password
+                  angiv eller skift din adgangskode
                 </Link>{' '}
-                from your profile settings — this signs out other sessions.
+                fra dine profilindstillinger — dette logger andre sessioner ud.
               </>
             ) : (
-              'set or change your password from your profile settings — this signs out other sessions.'
+              'angiv eller skift din adgangskode fra dine profilindstillinger — dette logger andre sessioner ud.'
             )}
           </>
         )}
       </Text>
 
       <TransactionalFooter>
-        You&apos;re receiving this because a new sign-in was detected on your account. These alerts
-        are required and can&apos;t be disabled.
+        Du modtager denne e-mail, fordi der blev registreret et nyt login på din konto. Disse
+        beskeder er obligatoriske og kan ikke slås fra.
       </TransactionalFooter>
     </EmailLayout>
   )

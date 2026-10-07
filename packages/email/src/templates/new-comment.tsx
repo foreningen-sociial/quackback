@@ -27,15 +27,15 @@ export function NewCommentEmail({
 }: NewCommentEmailProps) {
   return (
     <EmailLayout
-      preview={`New comment on "${postTitle}"`}
+      preview={`Ny kommentar på "${postTitle}"`}
       logoUrl={logoUrl}
       logoAlt={organizationName}
     >
       {/* Content */}
-      <Heading style={typography.h1}>New comment on your feedback</Heading>
+      <Heading style={typography.h1}>Ny kommentar på dit forslag</Heading>
       <Text style={typography.text}>
         {commenterName}
-        {isTeamMember ? ' (Team)' : ''} commented on your feedback in {organizationName}.
+        {isTeamMember ? ' (team)' : ''} kommenterede på dit forslag hos {organizationName}.
       </Text>
 
       {/* Post Title */}
@@ -55,7 +55,7 @@ export function NewCommentEmail({
             color: colors.textMuted,
           }}
         >
-          Feedback
+          Forslag
         </Text>
         <Text style={{ ...typography.text, marginTop: '0', marginBottom: '0', fontWeight: '600' }}>
           {postTitle}
@@ -82,13 +82,13 @@ export function NewCommentEmail({
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
         <Button style={button.primary} href={postUrl}>
-          View Comment
+          Se kommentar
         </Button>
       </Section>
 
       {/* Footer */}
       <NotificationFooter
-        reason="You received this email because you submitted or subscribed to this feedback."
+        reason="Du modtager denne e-mail, fordi du har indsendt eller abonneret på dette forslag."
         unsubscribeUrl={unsubscribeUrl}
         preferencesUrl={preferencesUrl}
       />

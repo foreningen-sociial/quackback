@@ -53,11 +53,11 @@ describe('sendTicketEventEmail', () => {
   })
 
   it.each<[TicketEmailKind, string]>([
-    ['created', 'We received your ticket #142: Export fails on large CSV'],
-    ['reply', 'New reply on #142: Export fails on large CSV'],
-    ['status_resolved', 'Your ticket #142 was resolved'],
-    ['assigned', 'Ticket #142 assigned to you'],
-    ['assigned_team', 'Ticket #142 assigned to your team'],
+    ['created', 'Vi har modtaget din sag #142: Export fails on large CSV'],
+    ['reply', 'Nyt svar på #142: Export fails on large CSV'],
+    ['status_resolved', 'Din sag #142 blev løst'],
+    ['assigned', 'Sag #142 tildelt dig'],
+    ['assigned_team', 'Sag #142 tildelt dit team'],
   ])('sends kind %s with the mapped subject', async (kind, subject) => {
     const result = await sendTicketEventEmail({ ...baseParams, kind })
     expect(result.sent).toBe(true)
@@ -77,11 +77,11 @@ describe('sendTicketEventEmail', () => {
       dueLabel: 'in 32 minutes',
     })
     expect(sendMailMock.mock.calls[0][0].subject).toBe(
-      'SLA at risk: first response due in 32 minutes'
+      'SLA i risiko: first response forfalder in 32 minutes'
     )
   })
 
-  it('B22: status_resolved with closedGeneric says "closed", never "resolved"', async () => {
+  it('B22: status_resolved with closedGeneric says "lukket", never "løst"', async () => {
     const result = await sendTicketEventEmail({
       ...baseParams,
       kind: 'status_resolved',
@@ -90,7 +90,7 @@ describe('sendTicketEventEmail', () => {
     })
     expect(result.sent).toBe(true)
     const call = sendMailMock.mock.calls[0][0]
-    expect(call.subject).toBe('Your ticket #142 was closed')
+    expect(call.subject).toBe('Din sag #142 blev lukket')
   })
 
   it('forwards threading headers, replyTo, and the from override when provided', async () => {

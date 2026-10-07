@@ -23,41 +23,47 @@ export function RecoveryCodeUsedEmail({
   occurredAt,
   logoUrl,
 }: RecoveryCodeUsedEmailProps) {
-  const workspaceLabel = workspaceName ? ` for ${workspaceName}` : ''
+  const workspaceLabel = workspaceName ? ` hos ${workspaceName}` : ''
   return (
-    <EmailLayout preview={`A recovery code was used to sign in${workspaceLabel}`} logoUrl={logoUrl}>
-      <Heading style={{ ...typography.h1, textAlign: 'center' }}>A recovery code was used</Heading>
+    <EmailLayout
+      preview={`En gendannelseskode blev brugt til at logge ind${workspaceLabel}`}
+      logoUrl={logoUrl}
+    >
+      <Heading style={{ ...typography.h1, textAlign: 'center' }}>
+        En gendannelseskode blev brugt
+      </Heading>
       <Text style={{ ...typography.text, textAlign: 'center' }}>
-        Someone signed in to your account{workspaceLabel} using one of your saved recovery codes.
+        Nogen loggede ind på din konto{workspaceLabel} med en af dine gemte gendannelseskoder.
       </Text>
 
       <Section style={{ marginTop: '24px', marginBottom: '24px' }}>
         <Text style={typography.textSmall}>
-          <strong>When:</strong> {occurredAt}
+          <strong>Hvornår:</strong> {occurredAt}
         </Text>
         {ipAddress ? (
           <Text style={typography.textSmall}>
-            <strong>IP address:</strong> {ipAddress}
+            <strong>IP-adresse:</strong> {ipAddress}
           </Text>
         ) : null}
         {userAgent ? (
           <Text style={typography.textSmall}>
-            <strong>Device:</strong> {userAgent}
+            <strong>Enhed:</strong> {userAgent}
           </Text>
         ) : null}
       </Section>
 
       <Text style={typography.text}>
-        If this was you, no action is needed. The code is now spent and can&apos;t be reused.
+        Hvis det var dig, behøver du ikke gøre noget. Koden er nu brugt og kan ikke genbruges.
       </Text>
       <Text style={typography.text}>
-        If this wasn&apos;t you, sign in and rotate your recovery codes immediately. The person who
-        used the code now has an active session — revoke it from your security settings.
+        Hvis det ikke var dig, så log ind og generér nye gendannelseskoder med det samme. Personen,
+        der brugte koden, har nu en aktiv session — tilbagekald den fra dine
+        sikkerhedsindstillinger.
       </Text>
 
       <TransactionalFooter>
-        You&apos;re receiving this because a recovery code on your account was just used. These
-        alerts are required and can&apos;t be disabled.
+        Du modtager denne e-mail, fordi en gendannelseskode på din konto lige er blevet brugt. Disse
+        beskeder er obligatoriske og kan ikke slås fra.
       </TransactionalFooter>
     </EmailLayout>
   )
