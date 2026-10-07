@@ -26,6 +26,7 @@ import {
 import { Avatar } from '@/components/ui/avatar'
 import { UserStatsBar } from '@/components/shared/user-stats'
 import {
+  ArrowLeftIcon,
   ArrowRightStartOnRectangleIcon,
   Cog6ToothIcon,
   ComputerDesktopIcon,
@@ -337,22 +338,33 @@ export function PortalHeader({
       <div>
         <div className="max-w-6xl mx-auto w-full px-4 sm:px-6">
           <div className="flex h-12 items-center justify-between">
-            <Link to="/" className="portal-header__logo flex items-center gap-2">
-              {orgLogo ? (
-                <img
-                  src={orgLogo}
-                  alt={orgName}
-                  className="h-8 w-8 [border-radius:calc(var(--radius)*0.6)]"
-                />
-              ) : (
-                <div className="h-8 w-8 [border-radius:calc(var(--radius)*0.6)] bg-primary flex items-center justify-center text-primary-foreground font-semibold">
-                  {orgName.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <span className="portal-header__name font-semibold hidden sm:block max-w-[18ch] line-clamp-2 text-[var(--header-foreground)]">
-                {orgName}
-              </span>
-            </Link>
+            <div className="flex items-center gap-1 min-w-0">
+              <Link to="/" className="portal-header__logo flex items-center gap-2 shrink-0">
+                {orgLogo ? (
+                  <img
+                    src={orgLogo}
+                    alt={orgName}
+                    className="h-8 w-8 [border-radius:calc(var(--radius)*0.6)]"
+                  />
+                ) : (
+                  <div className="h-8 w-8 [border-radius:calc(var(--radius)*0.6)] bg-primary flex items-center justify-center text-primary-foreground font-semibold">
+                    {orgName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="portal-header__name font-semibold hidden sm:block max-w-[18ch] line-clamp-2 text-[var(--header-foreground)]">
+                  {orgName}
+                </span>
+              </Link>
+              <a
+                href="https://socii.dk"
+                className="portal-header__back-to-socii ms-2 flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--header-border)] px-3 py-1.5 text-sm font-medium text-[var(--header-foreground)] transition-colors hover:bg-[var(--nav-active-background)]"
+              >
+                <ArrowLeftIcon className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">
+                  <FormattedMessage id="portal.header.backToSocii" defaultMessage="Back to Socii" />
+                </span>
+              </a>
+            </div>
             {authButtons}
           </div>
         </div>
