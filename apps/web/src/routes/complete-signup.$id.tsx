@@ -11,6 +11,8 @@ import {
 import { Spinner } from '@/components/shared/spinner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PortalIntlProvider } from '@/components/portal-intl-provider'
+import { loadPortalIntl } from '@/lib/server/functions/locale'
 import {
   acceptInvitationFn,
   getInvitationDetailsFn,
@@ -88,23 +90,35 @@ export const Route = createFileRoute('/complete-signup/$id')({
     const { id } = params
     const { session } = context
 
-    const branding = await getInviteBrandingFn({ data: id }).catch(() => DEFAULT_BRANDING)
+    const [branding, portalIntl] = await Promise.all([
+      getInviteBrandingFn({ data: id }).catch(() => DEFAULT_BRANDING),
+      loadPortalIntl(),
+    ])
 
     if (!session?.user) {
-      return { state: 'not-authenticated' as const, branding }
+      return { state: 'not-authenticated' as const, branding, portalIntl }
     }
 
     try {
       const data = await getInvitationDetailsFn({ data: id })
-      return { state: 'welcome' as const, ...data, branding }
+      return { state: 'welcome' as const, ...data, branding, portalIntl }
     } catch (err) {
       if (isRedirect(err)) throw err
       const message = err instanceof Error ? err.message : 'Failed to load invitation'
-      return { state: 'error' as const, error: message, branding }
+      return { state: 'error' as const, error: message, branding, portalIntl }
     }
   },
-  component: AcceptInvitationPage,
+  component: AcceptInvitationRoute,
 })
+
+function AcceptInvitationRoute() {
+  const { portalIntl } = Route.useLoaderData()
+  return (
+    <PortalIntlProvider locale={portalIntl.locale} messages={portalIntl.messages}>
+      <AcceptInvitationPage />
+    </PortalIntlProvider>
+  )
+}
 
 function AcceptInvitationPage() {
   const data = Route.useLoaderData()

@@ -9,6 +9,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { ArrowPathIcon } from '@heroicons/react/24/solid'
 import { Button } from '@/components/ui/button'
+import { PortalIntlProvider } from '@/components/portal-intl-provider'
+import { loadPortalIntl } from '@/lib/server/functions/locale'
 import { getInviteBrandingFn } from '@/lib/server/functions/invitations'
 import { parseInvitationId } from '@/lib/shared/parse-invitation-id'
 
@@ -47,8 +49,18 @@ export const Route = createFileRoute('/verify-magic-link')({
     callbackURL: (search.callbackURL as string) || undefined,
     errorCallbackURL: (search.errorCallbackURL as string) || undefined,
   }),
-  component: VerifyMagicLinkPage,
+  loader: async () => await loadPortalIntl(),
+  component: VerifyMagicLinkRoute,
 })
+
+function VerifyMagicLinkRoute() {
+  const { locale, messages } = Route.useLoaderData()
+  return (
+    <PortalIntlProvider locale={locale} messages={messages}>
+      <VerifyMagicLinkPage />
+    </PortalIntlProvider>
+  )
+}
 
 function VerifyMagicLinkPage() {
   const { token, callbackURL, errorCallbackURL } = Route.useSearch()

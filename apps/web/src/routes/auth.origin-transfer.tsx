@@ -3,6 +3,8 @@ import { createServerOnlyFn } from '@tanstack/react-start'
 import { getRequestHeaders, setResponseHeader } from '@tanstack/react-start/server'
 import { z } from 'zod'
 import { FormattedMessage } from 'react-intl'
+import { PortalIntlProvider } from '@/components/portal-intl-provider'
+import { loadPortalIntl } from '@/lib/server/functions/locale'
 import type { OriginTransferResult } from '@/lib/server/functions/origin-transfer'
 
 const searchSchema = z.object({
@@ -37,13 +39,26 @@ export const Route = createFileRoute('/auth/origin-transfer')({
   validateSearch: searchSchema.parse,
   loader: async ({ location }) => {
     const search = location.search as z.infer<typeof searchSchema>
-    return consumeOriginTransferOnRequest(search)
+    const [result, portalIntl] = await Promise.all([
+      consumeOriginTransferOnRequest(search),
+      loadPortalIntl(),
+    ])
+    return { result, ...portalIntl }
   },
-  component: OriginTransferPage,
+  component: OriginTransferRoute,
 })
 
+function OriginTransferRoute() {
+  const { locale, messages } = Route.useLoaderData()
+  return (
+    <PortalIntlProvider locale={locale} messages={messages}>
+      <OriginTransferPage />
+    </PortalIntlProvider>
+  )
+}
+
 function OriginTransferPage() {
-  const result = Route.useLoaderData()
+  const { result } = Route.useLoaderData()
   if (result.kind === 'redirect') return <OriginTransferContinue to={result.to} />
   return <OriginTransferError />
 }
