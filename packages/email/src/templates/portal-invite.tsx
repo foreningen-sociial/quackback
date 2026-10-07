@@ -17,15 +17,15 @@ export function PortalInviteEmail({
 }: PortalInviteEmailProps) {
   return (
     <EmailLayout
-      preview={`You've been invited to access the ${workspaceName} portal`}
+      preview={`Du er blevet inviteret til at få adgang til ${workspaceName}-portalen`}
       logoUrl={logoUrl}
       logoAlt={workspaceName}
     >
       {/* Content */}
-      <Heading style={typography.h1}>You&apos;ve been invited!</Heading>
+      <Heading style={typography.h1}>Du er blevet inviteret!</Heading>
       <Text style={typography.text}>
-        You&apos;ve been invited to access the <strong>{workspaceName}</strong> portal. Click below
-        to accept and sign in.
+        Du er blevet inviteret til at få adgang til <strong>{workspaceName}</strong>-portalen. Klik
+        nedenfor for at acceptere og logge ind.
       </Text>
 
       {personalMessage && (
@@ -48,13 +48,13 @@ export function PortalInviteEmail({
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
         <Button style={button.primary} href={inviteLink}>
-          Accept invitation
+          Accepter invitation
         </Button>
       </Section>
 
       {/* Fallback Link */}
       <Text style={typography.textSmall}>
-        Or copy and paste this link into your browser:{' '}
+        Eller kopiér og indsæt dette link i din browser:{' '}
         <Link href={inviteLink} style={utils.link}>
           {inviteLink}
         </Link>
@@ -62,7 +62,7 @@ export function PortalInviteEmail({
 
       {/* Footer */}
       <TransactionalFooter>
-        If you weren&apos;t expecting this invitation, you can ignore this email.
+        Hvis du ikke forventede denne invitation, kan du ignorere denne e-mail.
       </TransactionalFooter>
     </EmailLayout>
   )

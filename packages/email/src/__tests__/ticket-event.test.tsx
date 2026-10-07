@@ -25,7 +25,7 @@ describe('TicketEventEmail', () => {
     expect(html).toContain('Second paragraph after a blank line.')
     expect(html).toContain('Sarah')
     expect(html).toContain('View your ticket')
-    expect(html).toContain('Manage notification preferences')
+    expect(html).toContain('Administrer notifikationsindstillinger')
     expect(html).toContain('https://acme.example.com/settings/preferences')
   })
 

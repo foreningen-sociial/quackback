@@ -24,19 +24,19 @@ export function PostMentionEmail({
   preferencesUrl,
   logoUrl,
 }: PostMentionEmailProps) {
-  const displayName = mentionerName || 'Anonymous user'
+  const displayName = mentionerName || 'Anonym bruger'
   const hasExcerpt = excerpt.length > 0
 
   return (
     <EmailLayout
-      preview={`${displayName} mentioned you in "${postTitle}"`}
+      preview={`${displayName} nævnte dig i "${postTitle}"`}
       logoUrl={logoUrl}
       logoAlt={workspaceName}
     >
       {/* Content */}
-      <Heading style={typography.h1}>You were mentioned</Heading>
+      <Heading style={typography.h1}>Du blev nævnt</Heading>
       <Text style={typography.text}>
-        {displayName} mentioned you in {postTitle}.
+        {displayName} nævnte dig i {postTitle}.
       </Text>
 
       {/* Post Title */}
@@ -56,7 +56,7 @@ export function PostMentionEmail({
             color: colors.textMuted,
           }}
         >
-          Feedback
+          Forslag
         </Text>
         <Text style={{ ...typography.text, marginTop: '0', marginBottom: '0', fontWeight: '600' }}>
           {postTitle}
@@ -85,20 +85,20 @@ export function PostMentionEmail({
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
         <Button style={button.primary} href={postUrl}>
-          View Feedback
+          Se forslag
         </Button>
       </Section>
 
       {/* Footer */}
       {unsubscribeUrl ? (
         <NotificationFooter
-          reason={`You received this email because you were mentioned in ${workspaceName}.`}
+          reason={`Du modtager denne e-mail, fordi du blev nævnt hos ${workspaceName}.`}
           unsubscribeUrl={unsubscribeUrl}
           preferencesUrl={preferencesUrl}
         />
       ) : (
         <Text style={typography.footer}>
-          You received this email because you were mentioned in {workspaceName}.
+          Du modtager denne e-mail, fordi du blev nævnt hos {workspaceName}.
         </Text>
       )}
     </EmailLayout>

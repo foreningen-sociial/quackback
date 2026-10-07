@@ -64,12 +64,12 @@ describe('sendPostMentionEmail', () => {
       from: string
     }
     expect(call.to).toBe('user@example.com')
-    expect(call.subject).toBe('Alex mentioned you in "Why we should add dark mode"')
+    expect(call.subject).toBe('Alex nævnte dig i "Why we should add dark mode"')
     expect(call.html).toContain('Hey, take a look at this proposal.')
     expect(call.html).toContain('Alex')
   })
 
-  it('falls back to "Anonymous user" in the subject when mentionerName is empty', async () => {
+  it('falls back to "Anonym bruger" in the subject when mentionerName is empty', async () => {
     await sendPostMentionEmail({
       to: 'user@example.com',
       mentionerName: '',
@@ -82,6 +82,6 @@ describe('sendPostMentionEmail', () => {
 
     expect(sendMailMock).toHaveBeenCalledTimes(1)
     const call = sendMailMock.mock.calls[0][0] as { subject: string }
-    expect(call.subject).toBe('Anonymous user mentioned you in "Dark mode"')
+    expect(call.subject).toBe('Anonym bruger nævnte dig i "Dark mode"')
   })
 })

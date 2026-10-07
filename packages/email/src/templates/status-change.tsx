@@ -19,7 +19,7 @@ function getStatusEmoji(status: string): string {
     under_review: '\u{1F440}',
     planned: '\u{1F4C5}',
     in_progress: '\u{1F6A7}',
-    complete: '\u2705',
+    complete: '✅',
     closed: '\u{1F512}',
   }
   return map[status.toLowerCase().replace(/\s+/g, '_')] || '\u{1F4CC}'
@@ -48,16 +48,16 @@ export function StatusChangeEmail({
 
   return (
     <EmailLayout
-      preview={`${emoji} Your feedback is now ${formattedNewStatus}`}
+      preview={`${emoji} Dit forslag er nu ${formattedNewStatus}`}
       logoUrl={logoUrl}
       logoAlt={organizationName}
     >
       {/* Content */}
       <Heading style={typography.h1}>
-        {emoji} Your feedback is now {formattedNewStatus}!
+        {emoji} Dit forslag er nu {formattedNewStatus}!
       </Heading>
       <Text style={typography.text}>
-        Great news! The status of your feedback has been updated on {organizationName}.
+        Gode nyheder! Status for dit forslag er blevet opdateret hos {organizationName}.
       </Text>
 
       {/* Post Title */}
@@ -77,20 +77,20 @@ export function StatusChangeEmail({
       {/* Status Change */}
       <Text style={typography.text}>
         {formattedPreviousStatus}
-        {' \u2192 '}
+        {' → '}
         <strong>{formattedNewStatus}</strong>
       </Text>
 
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
         <Button style={button.primary} href={postUrl}>
-          View Feedback
+          Se forslag
         </Button>
       </Section>
 
       {/* Footer */}
       <NotificationFooter
-        reason="You received this email because you submitted or subscribed to this feedback."
+        reason="Du modtager denne e-mail, fordi du har indsendt eller abonneret på dette forslag."
         unsubscribeUrl={unsubscribeUrl}
         preferencesUrl={preferencesUrl}
       />

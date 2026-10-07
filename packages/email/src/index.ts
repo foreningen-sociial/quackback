@@ -627,7 +627,7 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
 
   return sendEmail({
     to,
-    subject: `You've been invited to join ${workspaceName} on Quackback`,
+    subject: `Du er blevet inviteret til at blive en del af ${workspaceName} på Quackback`,
     react: InvitationEmail({
       invitedByName,
       inviteeName,
@@ -657,7 +657,7 @@ export async function sendPortalInviteEmail(params: SendPortalInviteParams): Pro
 
   return sendEmail({
     to,
-    subject: `You've been invited to ${workspaceName}`,
+    subject: `Du er blevet inviteret til ${workspaceName}`,
     react: PortalInviteEmail({ workspaceName, inviteLink, logoUrl, personalMessage }),
     emailType: 'PortalInviteEmail',
     preview: { inviteLink },
@@ -681,7 +681,7 @@ export async function sendWelcomeEmail(params: SendWelcomeParams): Promise<Email
 
   return sendEmail({
     to,
-    subject: `Welcome to ${workspaceName} on Quackback!`,
+    subject: `Velkommen til ${workspaceName} på Quackback!`,
     react: WelcomeEmail({ name, workspaceName, dashboardUrl, logoUrl }),
     emailType: 'WelcomeEmail',
     preview: { dashboardUrl },
@@ -705,7 +705,7 @@ export async function sendMagicLinkEmail(params: SendMagicLinkParams): Promise<E
   log.debug('sending sign-in email')
   return sendEmail({
     to,
-    subject: 'Your Quackback sign-in link',
+    subject: 'Dit login-link til Quackback',
     react: MagicLinkEmail({ signInUrl, code, logoUrl }),
     emailType: 'MagicLinkEmail',
     preview: { signInUrl, code },
@@ -741,7 +741,7 @@ export async function sendSignupNotAllowedEmail(
   log.debug('sending sign-in refusal email')
   return sendEmail({
     to,
-    subject: 'About your Quackback sign-in request',
+    subject: 'Om din login-anmodning til Quackback',
     react: SignupNotAllowedEmail({ workspaceName, logoUrl }),
     emailType: 'SignupNotAllowedEmail',
   })
@@ -765,7 +765,7 @@ export async function sendPasswordResetEmail(
   log.debug('sending password reset email')
   return sendEmail({
     to,
-    subject: 'Reset your Quackback password',
+    subject: 'Nulstil din Quackback-adgangskode',
     react: PasswordResetEmail({ resetLink, logoUrl }),
     emailType: 'PasswordResetEmail',
     preview: { resetLink },
@@ -798,7 +798,7 @@ export async function sendRecoveryCodeUsedEmail(
   log.debug('sending recovery-code-used alert')
   return sendEmail({
     to,
-    subject: 'A recovery code on your account was just used',
+    subject: 'Der blev lige brugt en gendannelseskode på din konto',
     react: RecoveryCodeUsedEmail({ workspaceName, ipAddress, userAgent, occurredAt, logoUrl }),
     emailType: 'RecoveryCodeUsedEmail',
     preview: { occurredAt },
@@ -841,7 +841,7 @@ export async function sendNewSignInEmail(params: SendNewSignInParams): Promise<E
   log.debug('sending new-sign-in alert')
   return sendEmail({
     to,
-    subject: 'New sign-in to your account',
+    subject: 'Nyt login på din konto',
     react: NewSignInEmail({
       workspaceName,
       occurredAt,
@@ -890,7 +890,7 @@ export async function sendStatusChangeEmail(params: SendStatusChangeParams): Pro
 
   return sendEmail({
     to,
-    subject: `Your feedback is now ${formattedNewStatus}!`,
+    subject: `Dit forslag er nu ${formattedNewStatus}!`,
     react: StatusChangeEmail({
       postTitle,
       postUrl,
@@ -939,7 +939,7 @@ export async function sendNewCommentEmail(params: SendNewCommentParams): Promise
 
   return sendEmail({
     to,
-    subject: `New comment on "${postTitle}"`,
+    subject: `Ny kommentar på "${postTitle}"`,
     react: NewCommentEmail({
       postTitle,
       postUrl,
@@ -1107,7 +1107,7 @@ export async function sendConversationClosedEmail(params: {
 }): Promise<EmailResult> {
   const subject =
     conversationReplySubject(params.conversationSubject) ??
-    `Re: your conversation with ${params.workspaceName}`
+    `Re: din samtale med ${params.workspaceName}`
   return sendEmail({
     to: params.to,
     subject,
@@ -1142,13 +1142,13 @@ export async function sendConversationAutoAckEmail(params: {
 }): Promise<EmailResult> {
   const subject =
     conversationReplySubject(params.conversationSubject) ??
-    `Re: your message to ${params.workspaceName}`
+    `Re: din besked til ${params.workspaceName}`
   return sendEmail({
     to: params.to,
     subject,
     react: ConversationReplyEmail({
-      bodyHtml: `<p>We received your email and will get back to you shortly.</p>`,
-      messagePreview: 'We received your email and will get back to you shortly.',
+      bodyHtml: `<p>Vi har modtaget din e-mail og vender tilbage snarest.</p>`,
+      messagePreview: 'Vi har modtaget din e-mail og vender tilbage snarest.',
       agentName: params.workspaceName,
       teamName: params.workspaceName,
     }),
@@ -1228,22 +1228,22 @@ interface TicketEmailCopy {
  * facts (labels, names, times), never prose.
  */
 function ticketEventCopy(p: SendTicketEventEmailParams): TicketEmailCopy {
-  const requesterReason = `You're receiving this because you opened ticket ${p.ticketLabel} at ${p.workspaceName}.`
+  const requesterReason = `Du modtager denne e-mail, fordi du har oprettet sag ${p.ticketLabel} hos ${p.workspaceName}.`
   switch (p.kind) {
     case 'created':
       return {
-        subject: `We received your ticket ${p.ticketLabel}: ${p.title}`,
-        heading: "We've got your ticket",
-        intro: `Your ticket ${p.ticketLabel} "${p.title}" is with the ${p.workspaceName} team. We'll email you as soon as there's a reply.`,
-        ctaLabel: 'View your ticket',
+        subject: `Vi har modtaget din sag ${p.ticketLabel}: ${p.title}`,
+        heading: 'Vi har modtaget din sag',
+        intro: `Din sag ${p.ticketLabel} "${p.title}" er hos ${p.workspaceName}-teamet. Vi sender dig en e-mail, så snart der er et svar.`,
+        ctaLabel: 'Se din sag',
         reason: requesterReason,
       }
     case 'reply':
       return {
-        subject: `New reply on ${p.ticketLabel}: ${p.title}`,
-        heading: 'New reply on your ticket',
-        intro: `${p.authorName ?? 'The team'} replied to ${p.ticketLabel} "${p.title}":`,
-        ctaLabel: 'View your ticket',
+        subject: `Nyt svar på ${p.ticketLabel}: ${p.title}`,
+        heading: 'Nyt svar på din sag',
+        intro: `${p.authorName ?? 'Teamet'} svarede på ${p.ticketLabel} "${p.title}":`,
+        ctaLabel: 'Se din sag',
         reason: requesterReason,
       }
     case 'status_resolved':
@@ -1252,55 +1252,55 @@ function ticketEventCopy(p: SendTicketEventEmailParams): TicketEmailCopy {
       // customer story for a won't-do close is a plain close.
       if (p.closedGeneric) {
         return {
-          subject: `Your ticket ${p.ticketLabel} was closed`,
-          heading: 'Your ticket was closed',
-          intro: `${p.ticketLabel} "${p.title}" has been closed by the ${p.workspaceName} team.`,
-          note: 'If you have a follow-up, reply on the ticket thread — replying reopens it.',
-          ctaLabel: 'View your ticket',
+          subject: `Din sag ${p.ticketLabel} blev lukket`,
+          heading: 'Din sag blev lukket',
+          intro: `${p.ticketLabel} "${p.title}" er blevet lukket af ${p.workspaceName}-teamet.`,
+          note: 'Hvis du har en opfølgning, så svar i sagstråden — det genåbner sagen.',
+          ctaLabel: 'Se din sag',
           reason: requesterReason,
         }
       }
       return {
-        subject: `Your ticket ${p.ticketLabel} was resolved`,
-        heading: 'Your ticket was resolved',
-        intro: `${p.ticketLabel} "${p.title}" has been marked resolved by the ${p.workspaceName} team.`,
-        note: "Reply on the ticket thread if this isn't fixed for you; replying reopens it.",
-        ctaLabel: 'View your ticket',
+        subject: `Din sag ${p.ticketLabel} blev løst`,
+        heading: 'Din sag blev løst',
+        intro: `${p.ticketLabel} "${p.title}" er blevet markeret som løst af ${p.workspaceName}-teamet.`,
+        note: 'Svar i sagstråden, hvis dette ikke er løst for dig; det genåbner sagen.',
+        ctaLabel: 'Se din sag',
         reason: requesterReason,
       }
     case 'assigned':
       return {
-        subject: `Ticket ${p.ticketLabel} assigned to you`,
-        heading: 'You were assigned a ticket',
-        intro: `${p.ticketLabel} "${p.title}" was assigned to you.`,
-        ctaLabel: 'Open in inbox',
-        reason: "You're receiving this because the ticket was assigned to you.",
+        subject: `Sag ${p.ticketLabel} tildelt dig`,
+        heading: 'Du fik tildelt en sag',
+        intro: `${p.ticketLabel} "${p.title}" blev tildelt dig.`,
+        ctaLabel: 'Åbn i indbakke',
+        reason: 'Du modtager denne e-mail, fordi sagen blev tildelt dig.',
       }
     case 'assigned_team':
       return {
-        subject: `Ticket ${p.ticketLabel} assigned to your team`,
-        heading: 'A ticket was assigned to your team',
-        intro: `${p.ticketLabel} "${p.title}" was assigned to your team.`,
-        ctaLabel: 'Open in inbox',
-        reason: "You're receiving this because the ticket was assigned to your team.",
+        subject: `Sag ${p.ticketLabel} tildelt dit team`,
+        heading: 'En sag blev tildelt dit team',
+        intro: `${p.ticketLabel} "${p.title}" blev tildelt dit team.`,
+        ctaLabel: 'Åbn i indbakke',
+        reason: 'Du modtager denne e-mail, fordi sagen blev tildelt dit team.',
       }
     case 'sla_warning':
       return {
-        subject: `SLA at risk: ${p.clockLabel ?? 'response'} due ${p.dueLabel ?? 'soon'}`,
-        heading: `${capitalize(p.clockLabel ?? 'Response')} SLA approaching breach`,
-        intro: `The conversation with ${p.title} needs a ${p.clockLabel ?? 'response'} soon.`,
-        factLine: `${capitalize(p.clockLabel ?? 'Response')} due ${p.dueLabel ?? 'soon'}`,
-        ctaLabel: 'Open in inbox',
-        reason: "You're receiving this because you're responsible for this conversation.",
+        subject: `SLA i risiko: ${p.clockLabel ?? 'svar'} forfalder ${p.dueLabel ?? 'snart'}`,
+        heading: `${capitalize(p.clockLabel ?? 'Svar')}-SLA nærmer sig overskridelse`,
+        intro: `Samtalen med ${p.title} skal have et ${p.clockLabel ?? 'svar'} snart.`,
+        factLine: `${capitalize(p.clockLabel ?? 'Svar')} forfalder ${p.dueLabel ?? 'snart'}`,
+        ctaLabel: 'Åbn i indbakke',
+        reason: 'Du modtager denne e-mail, fordi du er ansvarlig for denne samtale.',
       }
     case 'sla_breach':
       return {
-        subject: `SLA breached: ${p.clockLabel ?? 'response'} for ${p.title}`,
-        heading: `${capitalize(p.clockLabel ?? 'Response')} SLA breached`,
-        intro: `The conversation with ${p.title} has passed its ${p.clockLabel ?? 'response'} target.`,
-        factLine: `${capitalize(p.clockLabel ?? 'Response')} was due ${p.dueLabel ?? 'earlier'}`,
-        ctaLabel: 'Open in inbox',
-        reason: "You're receiving this because you're responsible for this conversation.",
+        subject: `SLA overskredet: ${p.clockLabel ?? 'svar'} for ${p.title}`,
+        heading: `${capitalize(p.clockLabel ?? 'Svar')}-SLA overskredet`,
+        intro: `Samtalen med ${p.title} har overskredet sit ${p.clockLabel ?? 'svar'}-mål.`,
+        factLine: `${capitalize(p.clockLabel ?? 'Svar')} forfaldt ${p.dueLabel ?? 'tidligere'}`,
+        ctaLabel: 'Åbn i indbakke',
+        reason: 'Du modtager denne e-mail, fordi du er ansvarlig for denne samtale.',
       }
   }
 }
@@ -1376,8 +1376,8 @@ export async function sendPostMentionEmail(args: SendPostMentionEmailArgs): Prom
     logoUrl,
   } = args
 
-  const displayName = mentionerName || 'Anonymous user'
-  const subject = `${displayName} mentioned you in "${postTitle}"`
+  const displayName = mentionerName || 'Anonym bruger'
+  const subject = `${displayName} nævnte dig i "${postTitle}"`
 
   return sendEmail({
     to,
@@ -1435,11 +1435,11 @@ export async function sendNoteMentionEmail(args: SendNoteMentionEmailArgs): Prom
     references,
   } = args
 
-  const displayName = authorName || 'A teammate'
+  const displayName = authorName || 'En kollega'
 
   return sendEmail({
     to,
-    subject: `${displayName} mentioned you in an internal note`,
+    subject: `${displayName} nævnte dig i en intern note`,
     react: NoteMentionEmail({
       authorName,
       preview,
@@ -1496,7 +1496,7 @@ export async function sendChangelogPublishedEmail(
 
   return sendEmail({
     to,
-    subject: `New update: ${changelogTitle}`,
+    subject: `Ny opdatering: ${changelogTitle}`,
     react: ChangelogPublishedEmail({
       changelogTitle,
       changelogUrl,
@@ -1546,7 +1546,7 @@ export async function sendFeedbackLinkedEmail(
 
   return sendEmail({
     to,
-    subject: `Your feedback has been linked to "${postTitle}"`,
+    subject: `Dit forslag er blevet knyttet til "${postTitle}"`,
     react: FeedbackLinkedEmail({
       recipientName,
       postTitle,
@@ -1600,7 +1600,7 @@ export async function sendStatusIncidentPublishedEmail(
 
   return sendEmail({
     to,
-    subject: `Incident: ${incidentTitle}`,
+    subject: `Hændelse: ${incidentTitle}`,
     react: StatusIncidentPublishedEmail({
       workspaceName,
       incidentTitle,
@@ -1658,7 +1658,7 @@ export async function sendStatusMaintenanceScheduledEmail(
 
   return sendEmail({
     to,
-    subject: `Scheduled maintenance: ${maintenanceTitle}`,
+    subject: `Planlagt vedligeholdelse: ${maintenanceTitle}`,
     react: StatusMaintenanceScheduledEmail({
       workspaceName,
       maintenanceTitle,
@@ -1715,7 +1715,7 @@ export async function sendCsatRequestEmail(
 
   return sendEmail({
     to,
-    subject: 'How did we do?',
+    subject: 'Hvordan klarede vi os?',
     react: CsatRequestEmail({ promptText, ratingUrls, workspaceName, logoUrl }),
     from,
     conversationId,
@@ -1780,7 +1780,7 @@ export async function sendVerifyAddressEmail(
   log.debug('sending address verification code')
   return sendEmail({
     to,
-    subject: 'Confirm your email address',
+    subject: 'Bekræft din e-mailadresse',
     react: VerifyAddressEmail({ code, workspaceName, logoUrl }),
     emailType: 'VerifyAddressEmail',
   })

@@ -19,22 +19,22 @@ interface MagicLinkEmailProps {
  */
 export function MagicLinkEmail({ signInUrl, code, logoUrl }: MagicLinkEmailProps) {
   return (
-    <EmailLayout preview="Your sign-in link" logoUrl={logoUrl}>
-      <Heading style={{ ...typography.h1, textAlign: 'center' }}>Sign in to Quackback</Heading>
+    <EmailLayout preview="Dit loginlink" logoUrl={logoUrl}>
+      <Heading style={{ ...typography.h1, textAlign: 'center' }}>Log ind på Quackback</Heading>
       <Text style={{ ...typography.text, textAlign: 'center' }}>
-        Click the button below to finish signing in.
+        Klik på knappen nedenfor for at gennemføre login.
       </Text>
 
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
         <Button style={button.primary} href={signInUrl}>
-          Sign in
+          Log ind
         </Button>
       </Section>
 
       <Hr style={{ margin: '32px 0', borderColor: '#e5e7eb' }} />
 
       <Text style={{ ...typography.text, textAlign: 'center' }}>
-        Or enter this code on the sign-in screen:
+        Eller indtast denne kode på login-skærmen:
       </Text>
 
       <Section style={utils.codeBox}>
@@ -42,11 +42,11 @@ export function MagicLinkEmail({ signInUrl, code, logoUrl }: MagicLinkEmailProps
       </Section>
 
       <Text style={{ ...typography.textSmall, textAlign: 'center' }}>
-        The link and code expire in 10 minutes.
+        Linket og koden udløber om 10 minutter.
       </Text>
 
       <TransactionalFooter>
-        If you didn&apos;t request this, you can safely ignore this email.
+        Hvis du ikke har anmodet om dette, kan du roligt ignorere denne e-mail.
       </TransactionalFooter>
     </EmailLayout>
   )

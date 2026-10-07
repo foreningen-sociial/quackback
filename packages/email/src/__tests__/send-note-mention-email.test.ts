@@ -58,7 +58,7 @@ describe('sendNoteMentionEmail', () => {
     expect(sendMailMock).toHaveBeenCalledTimes(1)
     const call = sendMailMock.mock.calls[0][0] as { to: string; subject: string; html: string }
     expect(call.to).toBe('agent@example.com')
-    expect(call.subject).toBe('Jane mentioned you in an internal note')
+    expect(call.subject).toBe('Jane nævnte dig i en intern note')
     expect(call.html).toContain('can you take a look at the refund policy here?')
     expect(call.html).toContain('https://w.example/admin/inbox?i=conversation_1')
     // The only opt-out on an agent-facing alert is the preferences surface.
@@ -118,7 +118,7 @@ describe('sendNoteMentionEmail', () => {
 
     expect(sendMailMock).toHaveBeenCalledTimes(1)
     const call = sendMailMock.mock.calls[0][0] as { subject: string; html: string }
-    expect(call.subject).toBe('A teammate mentioned you in an internal note')
-    expect(call.html).toContain('Open conversation')
+    expect(call.subject).toBe('En kollega nævnte dig i en intern note')
+    expect(call.html).toContain('Åbn samtale')
   })
 })

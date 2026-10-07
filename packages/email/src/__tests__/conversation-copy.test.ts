@@ -53,8 +53,8 @@ describe('conversationMessageCopy', () => {
       workspaceName: 'Acme',
       channel: 'messenger',
     })
-    expect(copy.subject).toBe('New reply from Acme')
-    expect(copy.heading).toBe('New reply from Acme')
+    expect(copy.subject).toBe('Nyt svar fra Acme')
+    expect(copy.heading).toBe('Nyt svar fra Acme')
     expect(copy.useHumanTemplate).toBe(false)
   })
 
@@ -83,10 +83,10 @@ describe('conversationMessageCopy', () => {
       workspaceName: 'Acme',
       isFirstMessage: false,
     })
-    expect(first.intro).toBe('Priya started a conversation in Acme.')
-    expect(follow.intro).toBe('Priya sent a new message in Acme.')
+    expect(first.intro).toBe('Priya startede en samtale hos Acme.')
+    expect(follow.intro).toBe('Priya sendte en ny besked hos Acme.')
     expect(follow.useHumanTemplate).toBe(false)
-    expect(first.subject).toBe('Priya: New message')
+    expect(first.subject).toBe('Priya: Ny besked')
   })
 
   it('forwards the visitor name and subject on team alerts', () => {

@@ -30,7 +30,7 @@ describe('CsatRequestEmail', () => {
     const html = await render(
       <CsatRequestEmail promptText="" ratingUrls={ratingUrls} workspaceName="Acme" />
     )
-    expect(html).toContain('How did we do?')
+    expect(html).toContain('Hvordan klarede vi os?')
     expect(html).not.toContain('How did we do, Acme?')
     // react-email HTML-escapes `&` in href attributes.
     for (const url of ratingUrls) {

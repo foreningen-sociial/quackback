@@ -36,12 +36,12 @@ export function ConversationClosedEmail({
 }: ConversationClosedEmailProps) {
   const intro =
     variant === 'auto_closed'
-      ? "This conversation was closed because we haven't heard back from you."
-      : `${workspaceName} marked this conversation as resolved.`
+      ? 'Denne samtale blev lukket, fordi vi ikke har hørt fra dig.'
+      : `${workspaceName} markerede denne samtale som løst.`
   const followUp =
     variant === 'auto_closed'
-      ? 'Need anything else? Just reply to this email and the conversation will reopen.'
-      : 'Not sorted? Just reply to this email and the conversation will reopen.'
+      ? 'Mangler du mere hjælp? Svar blot på denne e-mail, så genåbnes samtalen.'
+      : 'Ikke løst endnu? Svar blot på denne e-mail, så genåbnes samtalen.'
 
   return (
     <Html>
@@ -56,7 +56,7 @@ export function ConversationClosedEmail({
         {ratingUrls ? (
           <>
             <Text style={{ margin: '20px 0 8px', color: '#1d2939', fontSize: '15px' }}>
-              {csatPrompt || 'How did we do?'}
+              {csatPrompt || 'Hvordan klarede vi os?'}
             </Text>
             <Text style={{ margin: '0 0 16px', fontSize: '28px', letterSpacing: '8px' }}>
               {CSAT_FACES.map((face, i) => (
@@ -71,7 +71,7 @@ export function ConversationClosedEmail({
         {viewUrl ? (
           <Text style={muted}>
             <a href={viewUrl} style={{ color: '#667085' }}>
-              View it online
+              Se den online
             </a>
           </Text>
         ) : null}
