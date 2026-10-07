@@ -924,6 +924,7 @@
   "portal.header.auth.signOut": "Sign out",
   "portal.header.auth.signUp": "Sign up",
   "portal.header.auth.signUpWith": "Sign up with {provider}",
+  "portal.header.backToSocii": "Back to Socii",
   "portal.header.nav.changelog": "Changelog",
   "portal.header.nav.feedback": "Feedback",
   "portal.header.nav.help": "Help Center",

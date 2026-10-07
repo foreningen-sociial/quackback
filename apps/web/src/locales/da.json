@@ -924,6 +924,7 @@
   "portal.header.auth.signOut": "Log ud",
   "portal.header.auth.signUp": "Opret konto",
   "portal.header.auth.signUpWith": "Opret konto med {provider}",
+  "portal.header.backToSocii": "Tilbage til Socii",
   "portal.header.nav.changelog": "Udgivelseshistorik",
   "portal.header.nav.feedback": "Forslag",
   "portal.header.nav.help": "Hjælpecenter",
