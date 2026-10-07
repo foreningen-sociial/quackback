@@ -4,6 +4,8 @@ import { useIntl, FormattedMessage } from 'react-intl'
 import { postAuthSuccess, postAuthError } from '@/lib/client/hooks/use-auth-broadcast'
 import { AUTH_BLOCK_MESSAGES, AUTH_BLOCK_MESSAGE_IDS } from '@/lib/shared/auth-block-messages'
 import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/solid'
+import { PortalIntlProvider } from '@/components/portal-intl-provider'
+import { loadPortalIntl } from '@/lib/server/functions/locale'
 
 /**
  * Auth Complete Page
@@ -21,8 +23,18 @@ export const Route = createFileRoute('/auth/auth-complete')({
   validateSearch: (search: Record<string, unknown>): { error?: string } => ({
     error: typeof search.error === 'string' ? search.error : undefined,
   }),
-  component: AuthCompletePage,
+  loader: async () => await loadPortalIntl(),
+  component: AuthCompleteRoute,
 })
+
+function AuthCompleteRoute() {
+  const { locale, messages } = Route.useLoaderData()
+  return (
+    <PortalIntlProvider locale={locale} messages={messages}>
+      <AuthCompletePage />
+    </PortalIntlProvider>
+  )
+}
 
 function AuthCompletePage() {
   const { error } = Route.useSearch()

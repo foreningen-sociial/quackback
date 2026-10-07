@@ -3,6 +3,8 @@ import { z } from 'zod'
 import type { ReactNode } from 'react'
 import { FormattedMessage } from 'react-intl'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
+import { PortalIntlProvider } from '@/components/portal-intl-provider'
+import { loadPortalIntl } from '@/lib/server/functions/locale'
 import {
   processUnsubscribeTokenFn,
   type UnsubscribeResult,
@@ -12,27 +14,43 @@ const searchSchema = z.object({
   token: z.string().optional(),
 })
 
+type UnsubscribeLoaderResult = UnsubscribeResult | { success: false; error: 'missing' }
+
 export const Route = createFileRoute('/unsubscribe')({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => ({ token: search.token }),
-  loader: async ({ deps }): Promise<UnsubscribeResult | { success: false; error: 'missing' }> => {
+  loader: async ({
+    deps,
+  }): Promise<{ result: UnsubscribeLoaderResult } & Awaited<ReturnType<typeof loadPortalIntl>>> => {
+    const portalIntl = await loadPortalIntl()
+
     if (!deps.token) {
-      return { success: false, error: 'missing' }
+      return { result: { success: false, error: 'missing' }, ...portalIntl }
     }
 
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(deps.token)) {
-      return { success: false, error: 'invalid' }
+      return { result: { success: false, error: 'invalid' }, ...portalIntl }
     }
 
-    return processUnsubscribeTokenFn({ data: { token: deps.token } })
+    const result = await processUnsubscribeTokenFn({ data: { token: deps.token } })
+    return { result, ...portalIntl }
   },
-  component: UnsubscribePage,
+  component: UnsubscribeRoute,
 })
 
+function UnsubscribeRoute() {
+  const { locale, messages } = Route.useLoaderData()
+  return (
+    <PortalIntlProvider locale={locale} messages={messages}>
+      <UnsubscribePage />
+    </PortalIntlProvider>
+  )
+}
+
 function UnsubscribePage() {
-  const result = Route.useLoaderData()
+  const { result } = Route.useLoaderData()
 
   if (result.success) {
     return <SuccessView result={result} />

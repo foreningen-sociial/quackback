@@ -46,6 +46,8 @@ import { z } from 'zod'
 import { FormattedMessage } from 'react-intl'
 import { isSafeCallbackUrl } from '@/lib/shared/routing'
 import { buildSigninRedirect } from '@/lib/shared/auth-prompt'
+import { PortalIntlProvider } from '@/components/portal-intl-provider'
+import { loadPortalIntl } from '@/lib/server/functions/locale'
 import type { UserId } from '@quackback/ids'
 
 /** Skip the portal cookie for teammates so a dashboard login is not replaced. */
@@ -108,7 +110,9 @@ const searchSchema = z.object({
 // Loader data type
 // ---------------------------------------------------------------------------
 
-type LoaderData = { status: 'invalid' | 'expired' | 'error' }
+type LoaderData = { status: 'invalid' | 'expired' | 'error' } & Awaited<
+  ReturnType<typeof loadPortalIntl>
+>
 
 // ---------------------------------------------------------------------------
 // Server fn: server-side OTT consumption
@@ -346,10 +350,20 @@ export const Route = createFileRoute('/auth/widget-handoff')({
     if (result.kind === 'redirect') {
       throw redirect({ to: result.to, search: result.search })
     }
-    return { status: result.status }
+    const portalIntl = await loadPortalIntl()
+    return { status: result.status, ...portalIntl }
   },
-  component: WidgetHandoffErrorPage,
+  component: WidgetHandoffRoute,
 })
+
+function WidgetHandoffRoute() {
+  const { locale, messages } = Route.useLoaderData()
+  return (
+    <PortalIntlProvider locale={locale} messages={messages}>
+      <WidgetHandoffErrorPage />
+    </PortalIntlProvider>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Error component — rendered on invalid/expired/replayed token

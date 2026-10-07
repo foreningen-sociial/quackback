@@ -17,6 +17,8 @@ import { CSAT_FACES } from '@/lib/shared/db-types'
 import { cn } from '@/lib/shared/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { PortalIntlProvider } from '@/components/portal-intl-provider'
+import { loadPortalIntl } from '@/lib/server/functions/locale'
 
 const searchSchema = z.object({
   token: z.string().optional(),
@@ -32,16 +34,28 @@ type CsatLoaderResult = { ok: true } | { ok: false; error: 'missing' | 'invalid'
 export const Route = createFileRoute('/csat')({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => ({ token: search.token }),
-  loader: async ({ deps }): Promise<CsatLoaderResult> => {
-    if (!deps.token) return { ok: false, error: 'missing' }
+  loader: async ({
+    deps,
+  }): Promise<{ result: CsatLoaderResult } & Awaited<ReturnType<typeof loadPortalIntl>>> => {
+    const portalIntl = await loadPortalIntl()
+    if (!deps.token) return { result: { ok: false, error: 'missing' }, ...portalIntl }
     const { valid } = await validateCsatEmailTokenFn({ data: { token: deps.token } })
-    return valid ? { ok: true } : { ok: false, error: 'invalid' }
+    return { result: valid ? { ok: true } : { ok: false, error: 'invalid' }, ...portalIntl }
   },
-  component: CsatPage,
+  component: CsatRoute,
 })
 
+function CsatRoute() {
+  const { locale, messages } = Route.useLoaderData()
+  return (
+    <PortalIntlProvider locale={locale} messages={messages}>
+      <CsatPage />
+    </PortalIntlProvider>
+  )
+}
+
 function CsatPage() {
-  const result = Route.useLoaderData()
+  const { result } = Route.useLoaderData()
   const { token, rating } = Route.useSearch()
 
   if (!result.ok) return <ErrorView error={result.error} />
