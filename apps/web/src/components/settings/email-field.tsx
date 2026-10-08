@@ -36,7 +36,15 @@ const message = (err: unknown, fallback: string) =>
  * proves the current address first so a stolen session cannot silently rebind
  * it.
  */
-export function EmailField() {
+export function EmailField({
+  ssoManaged = false,
+  onChanged,
+}: {
+  /** The address belongs to a domain that requires SSO; the server refuses changes too. */
+  ssoManaged?: boolean
+  /** After the address changes, so the page can re-read what depends on it. */
+  onChanged?: () => void | Promise<void>
+}) {
   const intl = useIntl()
   const { data, refetch } = useQuery({
     queryKey: ['email-change-state'],
@@ -131,10 +139,15 @@ export function EmailField() {
         const res = await confirmEmailChangeFn({ data: { email: newEmail, code: newCode } })
         if (!res.ok) {
           toast.error(
-            intl.formatMessage({
-              id: 'portal.settings.profile.email.codeInvalid',
-              defaultMessage: 'That code is not right, or the address is no longer available.',
-            })
+            res.reason === 'sso_managed'
+              ? intl.formatMessage({
+                  id: 'portal.settings.profile.email.ssoManaged',
+                  defaultMessage: 'Addresses at this domain are managed by single sign-on.',
+                })
+              : intl.formatMessage({
+                  id: 'portal.settings.profile.email.codeInvalid',
+                  defaultMessage: 'That code is not right, or the address is no longer available.',
+                })
           )
           return
         }
@@ -146,6 +159,7 @@ export function EmailField() {
         )
         reset()
         await refetch()
+        await onChanged?.()
       },
       intl.formatMessage({
         id: 'portal.settings.profile.email.confirmFailed',
@@ -172,19 +186,21 @@ export function EmailField() {
                 defaultMessage: 'No email address',
               })}
             />
-            <Button type="button" variant="outline" size="sm" onClick={begin} disabled={busy}>
-              {currentEmail ? (
-                <FormattedMessage
-                  id="portal.settings.profile.email.change"
-                  defaultMessage="Change"
-                />
-              ) : (
-                <FormattedMessage
-                  id="portal.settings.profile.email.add"
-                  defaultMessage="Add email"
-                />
-              )}
-            </Button>
+            {!ssoManaged && (
+              <Button type="button" variant="outline" size="sm" onClick={begin} disabled={busy}>
+                {currentEmail ? (
+                  <FormattedMessage
+                    id="portal.settings.profile.email.change"
+                    defaultMessage="Change"
+                  />
+                ) : (
+                  <FormattedMessage
+                    id="portal.settings.profile.email.add"
+                    defaultMessage="Add email"
+                  />
+                )}
+              </Button>
+            )}
           </div>
           {!currentEmail && (
             <p className="text-xs text-muted-foreground">
